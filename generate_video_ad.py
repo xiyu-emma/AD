@@ -1,4 +1,4 @@
-# generate_video_ad.py (最終完整修正版 v2)
+# generate_video_ad.py (最終完整修正版 v2 - 移除 tkinter)
 
 # --- 匯入函式庫 ---
 import os
@@ -16,9 +16,10 @@ import json
 import tempfile
 import math
 from typing import List, Tuple
-from tkinter import filedialog, messagebox, simpledialog
-import tkinter as tk
+# from tkinter import filedialog, messagebox, simpledialog # 移除
+# import tkinter as tk # 移除
 import traceback
+import argparse # 新增
 
 # --- 核心套件載入 ---
 try:
@@ -33,13 +34,16 @@ try:
     from mutagen.mp3 import MP3
     import whisper
 except ImportError as e:
-    root = tk.Tk()
-    root.withdraw()
-    messagebox.showerror(
-        "套件缺失錯誤",
-        f"錯誤：缺少必要的套件。請先執行 'pip install opencv-python \"scenedetect[opencv]\" numpy google-generativeai Pillow edge-tts moviepy mutagen openai-whisper tk' 來安裝。\n\n詳細錯誤: {e}"
-    )
-    sys.exit()
+    # root = tk.Tk() # 移除
+    # root.withdraw() # 移除
+    # messagebox.showerror( ... ) # 移除
+    
+    # --- 修改 ---
+    # 將錯誤訊息印到 stderr，讓 main.py 捕獲
+    print(f"[嚴重錯誤] 缺少必要的套件。請先執行 'pip install opencv-python \"scenedetect[opencv]\" numpy google-generativeai Pillow edge-tts moviepy mutagen openai-whisper' 來安裝。", file=sys.stderr)
+    print(f"\n詳細錯誤: {e}", file=sys.stderr)
+    # --- 修改結束 ---
+    sys.exit(1)
 
 nest_asyncio.apply()
 
@@ -52,8 +56,11 @@ try:
     if not API_KEY:
         raise FileNotFoundError
 except FileNotFoundError:
-    messagebox.showerror("API 金鑰錯誤", "找不到 'api_key.txt' 檔案，或檔案內容為空。請建立此檔案並填入您的 Google API 金鑰。")
-    sys.exit()
+    # messagebox.showerror("API 金鑰錯誤", "找不到 'api_key.txt' 檔案，或檔案內容為空。請建立此檔案並填入您的 Google API 金鑰。") # 移除
+    # --- 修改 ---
+    print("[嚴重錯誤] 找不到 'api_key.txt' 檔案，或檔案內容為空。請建立此檔案並填入您的 Google API 金鑰。", file=sys.stderr)
+    # --- 修改結束 ---
+    sys.exit(1)
 
 SECONDS_PER_CHAR = 0.2682
 VOICE = "zh-TW-HsiaoChenNeural"
@@ -360,7 +367,7 @@ async def _run_tts_tasks(descriptions):
                 communicate = edge_tts.Communicate(desc['text'], VOICE)
                 await communicate.save(desc['audio_path'])
             except Exception as e:
-                print(f"  - [警告] (TTS 任務 {index}) 生成失敗: '{desc['text'][:20]}...'。錯誤: {e}")
+                print(f"  - [警告] (TTS 任務 {index}) 生成失败: '{desc['text'][:20]}...'。错误: {e}")
 
     tasks = [safe_tts_task(desc, i + 1) for i, desc in enumerate(descriptions)]
     await asyncio.gather(*tasks)
@@ -535,16 +542,33 @@ def cleanup(keyframe_dir, temp_audio_dir):
             print(f" - [警告] 刪除 {temp_audio_dir} 失敗: {e}")
 
 def main():
-    root = tk.Tk()
-    root.withdraw()
-    video_filepath = filedialog.askopenfilename(
-        title="請選擇一個影片檔案",
-        filetypes=[("Video Files", "*.mp4 *.avi *.mov *.mkv")]
-    )
-    if not video_filepath:
-        print("未選擇任何檔案，程式結束。")
-        messagebox.showinfo("提示", "您沒有選擇任何影片檔案，處理程序已取消。")
-        return
+    # --- 【修改】移除 tkinter 詢問 ---
+    # root = tk.Tk()
+    # root.withdraw()
+    # video_filepath = filedialog.askopenfilename( ... )
+    # if not video_filepath:
+    #     print("未選擇任何檔案，程式結束。")
+    #     messagebox.showinfo("提示", "您沒有選擇任何影片檔案，處理程序已取消。")
+    #     return
+    
+    # --- 【修改】新增 argparse ---
+    parser = argparse.ArgumentParser(description="生成影片口述影像")
+    parser.add_argument("--video_file", type=str, required=True, help="要處理的影片檔案路徑")
+    parser.add_argument("--summary", type=str, required=True, help="使用者提供的影片摘要")
+    args = parser.parse_args()
+    
+    video_filepath = args.video_file
+    video_summary = args.summary
+    # --- argparse 結束 ---
+
+    if not os.path.exists(video_filepath):
+         print(f"錯誤：找不到影片檔案 {video_filepath}", file=sys.stderr)
+         sys.exit(1)
+
+    # --- 【修改】移除 video_summary 的 tkinter 詢問 ---
+    # video_summary = simpledialog.askstring("影片摘要", "請為這段影片提供一個簡短的摘要（例如：主角是誰、在做什麼）：", parent=root)
+    # if not video_summary:
+    #     video_summary = "一段影片。"
 
     VIDEO_FILENAME = os.path.basename(video_filepath)
     VIDEO_DIR = os.path.dirname(video_filepath)
@@ -554,10 +578,6 @@ def main():
     TEMP_AUDIO_DIR = os.path.join(VIDEO_DIR, f"temp_audio_{BASE_NAME}")
     FINAL_VIDEO_PATH = os.path.join(VIDEO_DIR, f"{BASE_NAME}_narrated.mp4")
     FINAL_TXT = os.path.join(VIDEO_DIR, f"{BASE_NAME}_final_script.txt")
-
-    video_summary = simpledialog.askstring("影片摘要", "請為這段影片提供一個簡短的摘要（例如：主角是誰、在做什麼）：", parent=root)
-    if not video_summary:
-        video_summary = "一段影片。"
 
     start_time = time.time()
     print("="*50)
@@ -615,24 +635,26 @@ def main():
         print("\n" + "="*50)
         print(summary_message.replace("\n\n", "\n"))
         print("="*50)
-        messagebox.showinfo("處理完成", summary_message)
+        # messagebox.showinfo("處理完成", summary_message) # 移除
 
     except Exception as e:
         error_message = f"[流程中止] 處理過程中發生嚴重錯誤: {e}"
-        print(error_message)
-        traceback.print_exc()
-        messagebox.showerror("處理失敗", error_message)
+        print(error_message, file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        # messagebox.showerror("處理失敗", error_message) # 移除
     finally:
+        # --- 【修改】移除 tkinter 詢問 ---
         if AUTO_CLEANUP_TEMP_FILES:
             cleanup(KEYFRAME_DIR, TEMP_AUDIO_DIR)
         else:
-            root_cleanup = tk.Tk()
-            root_cleanup.withdraw()
-            if messagebox.askyesno("清理暫存", "是否要刪除過程中產生的暫存檔案？", parent=root_cleanup):
-                cleanup(KEYFRAME_DIR, TEMP_AUDIO_DIR)
-            else:
-                print("已保留所有暫存檔案。")
-            root_cleanup.destroy()
+            # root_cleanup = tk.Tk()
+            # root_cleanup.withdraw()
+            # if messagebox.askyesno("清理暫存", "是否要刪除過程中產生的暫存檔案？", parent=root_cleanup):
+            #     cleanup(KEYFRAME_DIR, TEMP_AUDIO_DIR)
+            # else:
+            #     print("已保留所有暫存檔案。")
+            # root_cleanup.destroy()
+            print("已保留所有暫存檔案。") # 簡化邏輯
 
     print("\n--- 程式執行完畢 ---")
 

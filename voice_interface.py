@@ -1,4 +1,4 @@
-# voice_interface.py (修正後完整版)
+# voice_interface.py 
 
 import os
 import re
