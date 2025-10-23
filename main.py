@@ -56,6 +56,18 @@ _live_cam_countdown_job = None
 _live_cam_frame_job = None
 _live_cam_tk_img = None # 確保影像被引用
 
+
+# --- 主題色彩設定 (白色+淺藍色) ---
+THEME_BG = "#F4F9FF"
+THEME_CARD_BG = "#FFFFFF"
+THEME_ACCENT = "#38BDF8"
+THEME_ACCENT_HOVER = "#0EA5E9"
+THEME_TEXT = "#0F172A"
+THEME_SUBTEXT = "#2563EB"
+THEME_MUTED = "#1E3A8A"
+THEME_BORDER = "#C7E2FF"
+THEME_PREVIEW_BG = "#E6F2FF"
+THEME_TROUGH = "#EBF5FF"
 # --- GUI 輔助函式 ---
 
 def update_gui_safe(widget, text):
@@ -123,10 +135,10 @@ class ToolTip:
              self.tipwindow = tw = tk.Toplevel(self.widget)
              try: tw.wm_overrideredirect(1)
              except Exception: pass
-             tw.configure(bg="#111827")
-             label = tk.Label(tw, text=self.text, justify=tk.LEFT, background="#111827",
+             tw.configure(bg=THEME_ACCENT)
+             label = tk.Label(tw, text=self.text, justify=tk.LEFT, background=THEME_ACCENT,
                               foreground="white", relief=tk.SOLID, borderwidth=1,
-                              font=("Helvetica", 9), padx=6, pady=3)
+                              font=("Helvetica", 9), padx=8, pady=5)
              label.pack()
              if self.widget.winfo_exists():
                  tw.wm_geometry(f"+{x}+{y}")
@@ -775,54 +787,59 @@ def create_gui():
     root.geometry("1000x780")
     root.minsize(900, 680)
 
-    # --- 主題與色彩 ---
+    # --- 主題與色彩 (白色＋淺藍色主題) ---
     style = ttk.Style()
     try: style.theme_use("clam")
     except Exception: pass
-    ACCENT, ACCENT_HOVER, BG, TEXT, SUBTEXT, BORDER = "#4F46E5", "#4338CA", "#F8FAFC", "#111827", "#6B7280", "#E5E7EB"
-    try: root.configure(background=BG)
+
+    try: root.configure(background=THEME_BG)
     except tk.TclError: pass
 
     # --- 設定元件樣式 ---
-    style.configure("TFrame", background=BG)
-    style.configure("TLabel", background=BG, foreground=TEXT, font=("Helvetica", 10))
-    style.configure("Header.TLabel", background=BG, foreground=TEXT, font=("Helvetica", 20, "bold"))
-    style.configure("SubHeader.TLabel", background=BG, foreground=SUBTEXT, font=("Helvetica", 11))
-    style.configure("TLabelFrame", background=BG, foreground=TEXT, bordercolor=BORDER, relief=tk.SOLID, borderwidth=1)
-    style.configure("TLabelFrame.Label", background=BG, foreground=TEXT, font=("Helvetica", 11, "bold"))
-    style.configure("TButton", font=("Helvetica", 12), padding=(12, 10), borderwidth=1)
-    style.configure("Primary.TButton", background=ACCENT, foreground="white", relief=tk.FLAT)
-    style.map("Primary.TButton", background=[("active", ACCENT_HOVER), ("disabled", "#9CA3AF")], foreground=[("disabled", "#E5E7EB")])
-    style.configure("Secondary.TButton", background="#E5E7EB", foreground=TEXT, relief=tk.FLAT)
-    style.map("Secondary.TButton", background=[("active", "#D1D5DB")])
-    style.configure("Warning.TButton", background="#DC2626", foreground="white", relief=tk.FLAT) # 新增紅色按鈕
-    style.map("Warning.TButton", background=[("active", "#B91C1C"), ("disabled", "#9CA3AF")], foreground=[("disabled", "#E5E7EB")])
-    style.configure("Horizontal.TProgressbar", troughcolor=BORDER, background=ACCENT)
-    style.configure("Status.TLabel", background="#1F2937", foreground="#D1D5DB", font=("Consolas", 9))
+    style.configure("TFrame", background=THEME_BG)
+    style.configure("Main.TFrame", background=THEME_BG)
+    style.configure("Card.TFrame", background=THEME_CARD_BG)
+    style.configure("TLabel", background=THEME_BG, foreground=THEME_TEXT, font=("Helvetica", 10))
+    style.configure("Header.TLabel", background=THEME_BG, foreground=THEME_TEXT, font=("Helvetica", 22, "bold"))
+    style.configure("SubHeader.TLabel", background=THEME_BG, foreground=THEME_MUTED, font=("Helvetica", 11))
+    style.configure("Card.TLabelframe", background=THEME_CARD_BG, foreground=THEME_TEXT, bordercolor=THEME_BORDER, relief=tk.SOLID, borderwidth=1)
+    style.configure("Card.TLabelframe.Label", background=THEME_CARD_BG, foreground=THEME_MUTED, font=("Helvetica", 11, "bold"))
+    style.configure("SectionTitle.TLabel", background=THEME_CARD_BG, foreground=THEME_MUTED, font=("Helvetica", 10, "bold"))
+    style.configure("TButton", font=("Helvetica", 12), padding=(14, 10), borderwidth=0)
+    style.configure("Primary.TButton", background=THEME_ACCENT, foreground="white", relief=tk.FLAT)
+    style.map("Primary.TButton", background=[("active", THEME_ACCENT_HOVER), ("disabled", "#BBDFFB")], foreground=[("disabled", "#E2E8F0")])
+    style.configure("Secondary.TButton", background="#E1F3FF", foreground=THEME_TEXT, relief=tk.FLAT)
+    style.map("Secondary.TButton", background=[("active", "#CDE9FF")])
+    style.configure("Warning.TButton", background="#F87171", foreground="white", relief=tk.FLAT)
+    style.map("Warning.TButton", background=[("active", "#EF4444"), ("disabled", "#FBCFE8")], foreground=[("disabled", "#F3F4F6")])
+    style.configure("Preview.TLabel", background=THEME_PREVIEW_BG, foreground=THEME_MUTED, font=("Helvetica", 10))
+    style.configure("Status.TLabel", background="#E1F3FF", foreground=THEME_TEXT, font=("Consolas", 9))
+    style.configure("Horizontal.TProgressbar", troughcolor=THEME_TROUGH, background=THEME_ACCENT)
+
 
     # --- 主要容器 ---
-    main_frame = ttk.Frame(root, padding=20)
+    main_frame = ttk.Frame(root, padding=24, style="Main.TFrame")
     main_frame.pack(expand=True, fill="both")
 
     # --- 標題區 ---
     header_label = ttk.Label(main_frame, text="口述影像生成系統", style="Header.TLabel")
     header_label.pack(anchor="w")
     subheader_label = ttk.Label(main_frame, text="為視障者生成圖像與影片的口述影像旁白", style="SubHeader.TLabel")
-    subheader_label.pack(anchor="w", pady=(0, 15))
+    subheader_label.pack(anchor="w", pady=(0, 18))
 
     # --- 功能按鈕區 (修改) ---
-    btn_frame = ttk.Frame(main_frame)
-    btn_frame.pack(fill="x", pady=(5, 10))
+    btn_frame = ttk.Frame(main_frame, style="Main.TFrame")
+    btn_frame.pack(fill="x", pady=(5, 12))
     
     image_button = ttk.Button(btn_frame, text="🖼️ 生成圖像口述影像", command=start_image_analysis, style="Primary.TButton")
-    image_button.pack(side="left", expand=True, fill="x", padx=(0, 5)) # 修改 padding
+    image_button.pack(side="left", expand=True, fill="x", padx=(0, 6)) # 修改 padding
     
     video_button = ttk.Button(btn_frame, text="🎬 生成口述影像旁白", command=start_video_analysis, style="Primary.TButton")
-    video_button.pack(side="left", expand=True, fill="x", padx=5) # 修改 padding
+    video_button.pack(side="left", expand=True, fill="x", padx=6) # 修改 padding
     
     # 新增按鈕
     live_button = ttk.Button(btn_frame, text="📸 生成即時口述影像", command=start_live_capture, style="Primary.TButton")
-    live_button.pack(side="left", expand=True, fill="x", padx=(5, 0)) # 修改 padding
+    live_button.pack(side="left", expand=True, fill="x", padx=(6, 0)) # 修改 padding
 
     # --- 工具提示 (修改) ---
     try:
@@ -832,19 +849,30 @@ def create_gui():
     except Exception as e: print(f"無法建立工具提示: {e}")
 
     # --- 視覺輸出區 ---
-    output_area_frame = ttk.Frame(main_frame)
+    output_area_frame = ttk.Frame(main_frame, style="Main.TFrame")
     output_area_frame.pack(expand=True, fill="both", pady=10)
-    image_output_frame = ttk.LabelFrame(output_area_frame, text="圖像結果預覽", labelanchor="n", padding=10)
+    image_output_frame = ttk.LabelFrame(output_area_frame, text="圖像結果預覽", labelanchor="n", padding=15, style="Card.TLabelframe")
     image_output_frame.pack(side="left", expand=True, fill="both", padx=(0, 10))
-    image_preview_label = ttk.Label(image_output_frame, text="[此處顯示圖片預覽]", anchor=tk.CENTER, background=BORDER) 
+    image_preview_label = ttk.Label(image_output_frame, text="[此處顯示圖片預覽]", anchor=tk.CENTER, style="Preview.TLabel") 
     image_preview_label.pack(fill="x", pady=(5, 10))
-    ttk.Label(image_output_frame, text="生成的口述影像:", font=("Helvetica", 10, "bold")).pack(anchor="w", pady=(5,2))
-    narration_output_widget = scrolledtext.ScrolledText(image_output_frame, wrap=tk.WORD, height=6, state=tk.DISABLED, font=("Helvetica", 10), relief=tk.SOLID, borderwidth=1, bd=1)
+    ttk.Label(image_output_frame, text="生成的口述影像:", style="SectionTitle.TLabel").pack(anchor="w", pady=(5,2))
+    narration_output_widget = scrolledtext.ScrolledText(
+        image_output_frame,
+        wrap=tk.WORD,
+        height=6,
+        state=tk.DISABLED,
+        font=("Helvetica", 10),
+        relief=tk.SOLID,
+        borderwidth=1,
+        bd=1,
+        background=THEME_CARD_BG,
+        foreground=THEME_TEXT,
+    )
     narration_output_widget.pack(expand=True, fill="both")
 
-    video_output_frame = ttk.LabelFrame(output_area_frame, text="影片結果預覽", labelanchor="n", padding=10)
+    video_output_frame = ttk.LabelFrame(output_area_frame, text="影片結果預覽", labelanchor="n", padding=15, style="Card.TLabelframe")
     video_output_frame.pack(side="left", expand=True, fill="both", padx=(10, 0))
-    video_preview_label = ttk.Label(video_output_frame, text="[此處顯示影片預覽]", anchor=tk.CENTER, background=BORDER) 
+    video_preview_label = ttk.Label(video_output_frame, text="[此處顯示影片預覽]", anchor=tk.CENTER, style="Preview.TLabel") 
     video_preview_label.pack(fill="x", pady=(5, 10))
     open_external_btn = ttk.Button(video_output_frame, text="▶️ 在系統播放器中開啟", command=open_video_external, style="Secondary.TButton")
     open_external_btn.pack(pady=(5, 5))
@@ -852,9 +880,20 @@ def create_gui():
     except Exception: pass
 
     # --- 執行日誌輸出區 ---
-    result_frame = ttk.LabelFrame(main_frame, text="執行日誌", labelanchor="n", padding=10)
+    result_frame = ttk.LabelFrame(main_frame, text="執行日誌", labelanchor="n", padding=15, style="Card.TLabelframe")
     result_frame.pack(expand=True, fill="both", pady=(10, 0))
-    result_text_widget = scrolledtext.ScrolledText(result_frame, wrap=tk.WORD, height=10, state=tk.DISABLED, font=("Consolas", 9), relief=tk.SOLID, borderwidth=1, bd=1, background="#F9FAFB", foreground="#374151")
+    result_text_widget = scrolledtext.ScrolledText(
+        result_frame,
+        wrap=tk.WORD,
+        height=10,
+        state=tk.DISABLED,
+        font=("Consolas", 9),
+        relief=tk.SOLID,
+        borderwidth=1,
+        bd=1,
+        background=THEME_CARD_BG,
+        foreground=THEME_TEXT,
+    )
     result_text_widget.pack(expand=True, fill="both")
 
     # --- 狀態列與進度列 ---
