@@ -1,5 +1,4 @@
-# generate_video_ad.py (最終完整修正版 v2 - 移除 tkinter)
-
+# generate_video_ad.py 
 # --- 匯入函式庫 ---
 import os
 import cv2
@@ -16,8 +15,6 @@ import json
 import tempfile
 import math
 from typing import List, Tuple
-# from tkinter import filedialog, messagebox, simpledialog # 移除
-# import tkinter as tk # 移除
 import traceback
 import argparse # 新增
 
@@ -28,15 +25,12 @@ try:
     import google.generativeai as genai
     from PIL import Image
     from google.api_core.exceptions import ResourceExhausted, GoogleAPICallError, NotFound
-    from azure_tts import synthesize_speech_to_file_async, AzureTTSException
+    from voice_interface import synthesize_speech_to_file_async, AzureTTSException
     from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip, vfx
     import moviepy.audio.fx.all as afx # 【核心修正】導入音訊效果模組
     from mutagen.mp3 import MP3
     import whisper
 except ImportError as e:
-    # root = tk.Tk() # 移除
-    # root.withdraw() # 移除
-    # messagebox.showerror( ... ) # 移除
     
     # --- 修改 ---
     # 將錯誤訊息印到 stderr，讓 main.py 捕獲
@@ -518,7 +512,8 @@ def step6_synthesize_final_video(video_path, descriptions, output_path):
             video_clip.audio = final_audio.set_duration(video_clip.duration)
 
         print(f"\n正在生成最終影片 -> {output_path}")
-        video_clip.write_videofile(output_path, codec='libx264', audio_codec='aac', threads=4, logger='bar')
+        # 【核心修正】將 logger='bar' 改為 None，以避免在子程序中因進度條輸出而卡住
+        video_clip.write_videofile(output_path, codec='libx264', audio_codec='aac', threads=4, logger=None)
         
         return True
 
@@ -635,6 +630,10 @@ def main():
             print(f"\n[成功] 文字稿已儲存至 {FINAL_TXT}")
 
         end_time = time.time()
+        # --- 【修改】新增 FINAL_VIDEO: 輸出，以便 main.py 捕捉 ---
+        print(f"FINAL_VIDEO: {FINAL_VIDEO_PATH}")
+        # --- 修改結束 ---
+
         summary_message = (
             f"所有處理流程已成功完成！\n\n"
             f"最終影片已儲存為：\n{FINAL_VIDEO_PATH}\n\n"

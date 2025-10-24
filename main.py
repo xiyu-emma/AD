@@ -1,4 +1,4 @@
-# main.py (單一環境最終整合版 - 已新增即時拍照功能)
+# main.py 
 
 import tkinter as tk
 from tkinter import ttk, filedialog, scrolledtext, simpledialog, messagebox
@@ -55,6 +55,10 @@ _live_cam_cap = None
 _live_cam_countdown_job = None
 _live_cam_frame_job = None
 _live_cam_tk_img = None # 確保影像被引用
+
+# --- 新增：執行緒同步旗標 ---
+_is_task_running = threading.Event()
+_is_task_running.set() # 初始狀態為 "不在執行任務"
 
 
 # --- 主題色彩設定 (白色+淺藍色) ---
@@ -416,11 +420,12 @@ def enable_buttons():
 
 def set_busy(is_busy: bool):
     """設定 GUI 為忙碌或空閒狀態 (加入檢查)"""
-    global app_window, progress_bar, status_bar
+    global app_window, progress_bar, status_bar, _is_task_running
     if not app_window or not app_window.winfo_exists() or progress_bar is None: return
 
     try:
         if is_busy:
+            _is_task_running.clear() # 【修改】設定旗標為 "正在執行任務"
             # 禁用所有按鈕
             if image_button and image_button.winfo_exists(): image_button.config(state=tk.DISABLED)
             if video_button and video_button.winfo_exists(): video_button.config(state=tk.DISABLED)
@@ -428,12 +433,13 @@ def set_busy(is_busy: bool):
             
             if status_bar and status_bar.winfo_exists():
                 progress_bar.pack(side=tk.BOTTOM, fill=tk.X, before=status_bar)
-            else: 
+            else:
                  progress_bar.pack(side=tk.BOTTOM, fill=tk.X)
             try: progress_bar.start(10)
             except tk.TclError: pass
             app_window.config(cursor='watch')
         else:
+            _is_task_running.set() # 【修改】設定旗標為 "任務已結束"
             # 啟用按鈕 (由 enable_buttons 函式處理)
             try: progress_bar.stop()
             except tk.TclError: pass
@@ -441,7 +447,7 @@ def set_busy(is_busy: bool):
             app_window.config(cursor='')
             # enable_buttons() 會由 run_script_in_thread 的 finally 呼叫
     except tk.TclError:
-        pass 
+        pass
 
 # --- 啟動流程 ---
 def start_image_analysis():
@@ -750,6 +756,15 @@ def voice_interaction_loop():
     while session_active:
         if not app_window or not app_window.winfo_exists(): break
         
+        # --- 【修改】增加任務執行中斷點 ---
+        if not _is_task_running.is_set():
+            print("[語音迴圈] 偵測到任務正在執行，暫停等待...")
+            _is_task_running.wait() # 等待直到 _is_task_running.set() 被呼叫
+            print("[語音迴圈] 任務完成，恢復語音互動。")
+            speak("任務已完成，請問接下來需要做什麼？")
+            continue # 重新開始迴圈，而不是直接詢問指令
+        # --- 修改結束 ---
+
         # --- (修改) 增加語音指令 ---
         prompt = "請說出指令：生成圖像、生成影片、即時拍照，或 結束"
         command = voice_input(prompt)
