@@ -28,7 +28,7 @@ try:
     import google.generativeai as genai
     from PIL import Image
     from google.api_core.exceptions import ResourceExhausted, GoogleAPICallError, NotFound
-    import edge_tts
+    from azure_tts import synthesize_speech_to_file_async, AzureTTSException
     from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip, vfx
     import moviepy.audio.fx.all as afx # 【核心修正】導入音訊效果模組
     from mutagen.mp3 import MP3
@@ -40,7 +40,7 @@ except ImportError as e:
     
     # --- 修改 ---
     # 將錯誤訊息印到 stderr，讓 main.py 捕獲
-    print(f"[嚴重錯誤] 缺少必要的套件。請先執行 'pip install opencv-python \"scenedetect[opencv]\" numpy google-generativeai Pillow edge-tts moviepy mutagen openai-whisper' 來安裝。", file=sys.stderr)
+    print(f"[嚴重錯誤] 缺少必要的套件。請先執行 'pip install opencv-python \"scenedetect[opencv]\" numpy google-generativeai Pillow moviepy mutagen openai-whisper' 來安裝。", file=sys.stderr)
     print(f"\n詳細錯誤: {e}", file=sys.stderr)
     # --- 修改結束 ---
     sys.exit(1)
@@ -64,6 +64,7 @@ except FileNotFoundError:
 
 SECONDS_PER_CHAR = 0.2682
 VOICE = "zh-TW-HsiaoChenNeural"
+VOICE_LOCALE = "zh-TW"
 BACKGROUND_VOLUME = 0.7
 NARRATION_VOLUME = 1.9
 MAX_SPEEDUP_FACTOR = 1.15
@@ -359,15 +360,23 @@ def step3_refine_and_merge_descriptions(api_key, initial_data, video_summary, no
         return initial_data
 
 async def _run_tts_tasks(descriptions):
-    semaphore = asyncio.Semaphore(5) 
+    semaphore = asyncio.Semaphore(5)
+
     async def safe_tts_task(desc, index):
         async with semaphore:
             try:
                 print(f"  - (TTS 任務 {index}) 開始生成: '{desc['text'][:20]}...'")
-                communicate = edge_tts.Communicate(desc['text'], VOICE)
-                await communicate.save(desc['audio_path'])
+                await synthesize_speech_to_file_async(
+                    desc['text'],
+                    VOICE,
+                    desc['audio_path'],
+                    speech_rate=1.0,
+                    language=VOICE_LOCALE,
+                )
+            except AzureTTSException as e:
+                print(f"  - [警告] (TTS 任務 {index}) 生成失敗 (Azure): '{desc['text'][:20]}...'。錯誤: {e}")
             except Exception as e:
-                print(f"  - [警告] (TTS 任務 {index}) 生成失败: '{desc['text'][:20]}...'。错误: {e}")
+                print(f"  - [警告] (TTS 任務 {index}) 生成失敗: '{desc['text'][:20]}...'。錯誤: {e}")
 
     tasks = [safe_tts_task(desc, i + 1) for i, desc in enumerate(descriptions)]
     await asyncio.gather(*tasks)
