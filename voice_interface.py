@@ -5,21 +5,21 @@ import re
 import speech_recognition as sr
 import asyncio
 import nest_asyncio
-import edge_tts
 import time
 import pygame
 import json
 from datetime import datetime
 import winsound
-import traceback # 新增
+import traceback
 import uuid
+from azure_tts import synthesize_speech_to_file_async, AzureTTSException
 
 # --------------------------------------------------------------------------
 #                           【語音設定】
 # --------------------------------------------------------------------------
 LANG_CONFIG = {
-    "zh-TW": {"voice": "zh-TW-HsiaoChenNeural"},
-    "en-US": {"voice": "en-US-JennyNeural"}
+    "zh-TW": {"voice": "zh-TW-HsiaoChenNeural", "locale": "zh-TW"},
+    "en-US": {"voice": "en-US-JennyNeural", "locale": "en-US"},
 }
 
 # --------------------------------------------------------------------------
@@ -114,81 +114,76 @@ def speak(text, wait=True):
 
     temp_dir = "temp_audio"
     os.makedirs(temp_dir, exist_ok=True)
-    # 使用 UUID 確保檔名唯一性，避免衝突
     output_file = os.path.join(temp_dir, f"speech_{uuid.uuid4()}.mp3")
 
     async def _generate_speech():
         try:
-            rate_str = f"+{int((speech_rate - 1) * 100)}%" if speech_rate >= 1 else f"-{int((1 - speech_rate) * 100)}%"
-            communicate = edge_tts.Communicate(text, voice, rate=rate_str)
-            await communicate.save(output_file)
+            locale = LANG_CONFIG[lang_code].get("locale", "zh-TW")
+            await synthesize_speech_to_file_async(
+                text,
+                voice,
+                output_file,
+                speech_rate=speech_rate,
+                language=locale,
+            )
 
-            # 播放前再次檢查 mixer 狀態
             if not pygame.mixer.get_init():
-                 print("[警告] Pygame mixer 在生成語音後變為未初始化狀態。")
-                 return
+                print("[警告] Pygame mixer 在生成語音後變為未初始化狀態。")
+                return
 
-            # 載入和播放包在 try...except 中
             try:
                 pygame.mixer.music.load(output_file)
                 pygame.mixer.music.set_volume(voice_ux.volume)
                 pygame.mixer.music.play()
             except pygame.error as pg_err:
-                 print(f"Pygame 載入或播放錯誤: {pg_err}")
-                 audio.beep_error() # 嘗試播放錯誤音效
-                 return # 播放失敗直接返回
+                print(f"Pygame 載入或播放錯誤: {pg_err}")
+                audio.beep_error()
+                return
 
             if wait:
                 while pygame.mixer.get_init() and pygame.mixer.music.get_busy():
-                    await asyncio.sleep(0.1) # 在異步函式中使用 asyncio.sleep
+                    await asyncio.sleep(0.1)
 
-        except edge_tts.NoAudioReceived:
-            print(f"語音生成錯誤 (Edge TTS): 未收到音訊。文字: '{text[:30]}...'")
+        except AzureTTSException as e:
+            print(f"語音生成錯誤 (Azure TTS): {e}")
             audio.beep_error()
         except Exception as e:
             print(f"語音生成或播放時發生未知錯誤: {e}")
-            traceback.print_exc() # 打印詳細錯誤
+            traceback.print_exc()
             audio.beep_error()
         finally:
-            # --- 清理檔案 ---
-            # 確保播放（如果開始了）已停止
             try:
                 if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
                     pygame.mixer.music.stop()
                 if pygame.mixer.get_init():
-                    pygame.mixer.music.unload() # 釋放文件鎖定
-            except Exception: pass # 忽略 unload 可能的錯誤
+                    pygame.mixer.music.unload()
+            except Exception:
+                pass
 
-            await asyncio.sleep(0.2) # 給系統一點時間釋放文件
+            await asyncio.sleep(0.2)
 
             if os.path.exists(output_file):
                 try:
-                    # 嘗試多次刪除，應對 Windows 檔案鎖定
                     for _ in range(3):
                         try:
                             os.remove(output_file)
-                            # print(f"已刪除暫存檔: {output_file}") # 調試用
-                            break # 成功刪除則跳出
+                            break
                         except PermissionError:
                             await asyncio.sleep(0.3)
-                    else: # 如果嘗試多次仍失敗
-                         print(f"[警告] 無法刪除暫存語音檔 (可能仍被占用): {output_file}")
+                    else:
+                        print(f"[警告] 無法刪除暫存語音檔 (可能仍被占用): {output_file}")
                 except Exception as e:
-                     print(f"[警告] 刪除暫存語音檔時發生錯誤: {e}")
+                    print(f"[警告] 刪除暫存語音檔時發生錯誤: {e}")
 
-
-    # --- 事件迴圈處理 ---
     try:
-        # 嘗試獲取正在運行的事件迴圈
         loop = asyncio.get_running_loop()
-        # 如果已有迴圈在運行（例如在 Tkinter 主迴圈的執行緒中），創建任務在該迴圈執行
         loop.create_task(_generate_speech())
     except RuntimeError:
-        # 如果沒有正在運行的迴圈（例如單獨測試此模組），則啟動一個新的來執行
         try:
             asyncio.run(_generate_speech())
         except Exception as e:
-             print(f"執行 asyncio.run 時出錯: {e}")
+            print(f"執行 asyncio.run 時出錯: {e}")
+
 
 
 def voice_input(prompt, timeout=15):
