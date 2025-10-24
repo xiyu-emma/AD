@@ -61,6 +61,12 @@ _is_task_running = threading.Event()
 _is_task_running.set() # 初始狀態為 "不在執行任務"
 
 
+# --- 新增：模型預載入狀態 ---
+_preloading_in_progress = False
+_preload_completed = False
+_preload_error = None
+LLAMA_MODEL_DIR = os.path.join(".", "models", "Llama-3.2-11B-Vision-Instruct")
+
 # --- 主題色彩設定 (白色+淺藍色) ---
 THEME_BG = "#F4F9FF"
 THEME_CARD_BG = "#FFFFFF"
@@ -743,6 +749,52 @@ def start_live_capture():
     
     # 啟動倒數
     run_countdown(3)
+# --- 預載入模型與資料庫功能 ---
+def preload_llama_and_db():
+    """在背景執行緒中預載入 LLaMA 模型和資料庫"""
+    global _preloading_in_progress, _preload_completed, _preload_error
+
+    if _preload_completed or _preloading_in_progress:
+        return
+
+    _preloading_in_progress = True
+    model_dir = LLAMA_MODEL_DIR
+
+    if not os.path.isdir(model_dir):
+        print(f"[預載入] 找不到模型資料夾 {model_dir}，跳過預載入。")
+        _preload_error = f"找不到模型資料夾: {model_dir}"
+        _preloading_in_progress = False
+        return
+
+    print(f"[預載入] 開始預載入 LLaMA 模型和 RAG 資料庫...")
+    if app_window and app_window.winfo_exists():
+        app_window.after(0, update_status_safe, "正在預載入模型...")
+
+    try:
+        import generate_image_ad
+        resources = generate_image_ad.preload_resources(model_dir)
+
+        if resources:
+            print("[預載入] LLaMA 模型和 RAG 資料庫預載入完成！")
+            if app_window and app_window.winfo_exists():
+                app_window.after(0, update_status_safe, "模型預載入完成，準備就緒")
+                app_window.after(0, update_gui_safe, result_text_widget, "[系統] LLaMA 模型和 RAG 資料庫已預先載入，可快速執行圖像口述影像生成。")
+            _preload_completed = True
+        else:
+            print("[預載入] 預載入失敗。")
+            _preload_error = "預載入資源返回 None"
+            if app_window and app_window.winfo_exists():
+                app_window.after(0, update_status_safe, "模型預載入失敗")
+    except Exception as e:
+        print(f"[預載入] 發生錯誤: {e}")
+        traceback.print_exc()
+        _preload_error = str(e)
+        if app_window and app_window.winfo_exists():
+            app_window.after(0, update_status_safe, "模型預載入發生錯誤")
+            app_window.after(0, update_gui_safe, result_text_widget, f"[警告] 模型預載入失敗: {e}")
+    finally:
+        _preloading_in_progress = False
+
 
 
 # --- 語音互動迴圈 ---
