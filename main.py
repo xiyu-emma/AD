@@ -306,7 +306,7 @@ def open_video_external():
 def run_script_in_thread(script_name: str, script_type: str, args: list):
     """在背景執行緒中執行腳本並將輸出傳回 GUI (已加入 winfo_exists 檢查)"""
     global _last_selected_image_path
-    if app_window and app_window.winfo_exists():
+    if app_window:
         app_window.after(0, update_status_safe, f"正在執行 {script_type} 程序...")
         app_window.after(0, update_gui_safe, result_text_widget, f"\n--- 開始執行 {script_name} ---")
     if VOICE_ENABLED: speak(f"正在啟動，{script_type}口述影像生成程序")
@@ -331,7 +331,7 @@ def run_script_in_thread(script_name: str, script_type: str, args: list):
         if process.stdout:
             for line in iter(process.stdout.readline, ''):
                 print(line, end='')
-                if app_window and app_window.winfo_exists():
+                if app_window:
                     app_window.after(0, update_gui_safe, result_text_widget, line.strip())
                 s_line = line.strip()
                 if s_line.startswith("FINAL_ANSWER:"): final_answer = s_line.replace("FINAL_ANSWER:", "").strip()
@@ -351,18 +351,18 @@ def run_script_in_thread(script_name: str, script_type: str, args: list):
         if return_code == 0:
             success_msg = f"--- {script_name} 執行成功 ---"
             print(success_msg)
-            if app_window and app_window.winfo_exists():
+            if app_window:
                 app_window.after(0, update_gui_safe, result_text_widget, success_msg)
                 app_window.after(0, update_status_safe, f"{script_type} 完成")
             if VOICE_ENABLED: speak(f"{script_type} 處理完成")
 
             if script_name == 'generate_video_ad.py':
                 if final_video_path and os.path.exists(final_video_path):
-                    if app_window and app_window.winfo_exists():
+                    if app_window:
                         app_window.after(0, play_video_in_ui, final_video_path)
                         app_window.after(0, update_gui_safe, result_text_widget, f"[提示] 影片已生成: {final_video_path}")
                 else:
-                    if app_window and app_window.winfo_exists():
+                    if app_window:
                         app_window.after(0, update_gui_safe, result_text_widget, "[警告] 未找到生成的影片檔案路徑或檔案不存在。")
 
         else:
@@ -371,7 +371,7 @@ def run_script_in_thread(script_name: str, script_type: str, args: list):
             error_msg_stderr = f"\n--- 錯誤輸出 (stderr) ---\n{error_details}\n-------------------------"
             full_error_msg = error_msg_header + error_msg_stderr
             print(full_error_msg)
-            if app_window and app_window.winfo_exists():
+            if app_window:
                 app_window.after(0, update_gui_safe, result_text_widget, full_error_msg)
                 app_window.after(0, update_status_safe, f"{script_type} 執行失敗")
             if VOICE_ENABLED: speak(f"啟動 {script_type} 處理程序時發生錯誤"); audio.beep_error()
@@ -379,14 +379,14 @@ def run_script_in_thread(script_name: str, script_type: str, args: list):
     except FileNotFoundError:
         error_msg = f"錯誤：找不到腳本檔案 '{script_name}' 或 Python 執行檔 '{sys.executable}'"
         print(error_msg)
-        if app_window and app_window.winfo_exists():
+        if app_window:
              app_window.after(0, update_gui_safe, result_text_widget, error_msg)
              app_window.after(0, update_status_safe, f"{script_type} 失敗 (找不到檔案)")
         if VOICE_ENABLED: speak(f"啟動{script_type}失敗，找不到檔案"); audio.beep_error()
     except Exception as e:
         error_msg = f"執行 {script_name} 時發生未預期的錯誤: {e}\n{traceback.format_exc()}"
         print(error_msg)
-        if app_window and app_window.winfo_exists():
+        if app_window:
              app_window.after(0, update_gui_safe, result_text_widget, error_msg)
              app_window.after(0, update_status_safe, f"{script_type} 失敗 (未知錯誤)")
         if VOICE_ENABLED: speak(f"啟動{script_type}時發生未知錯誤"); audio.beep_error()
@@ -401,7 +401,7 @@ def run_script_in_thread(script_name: str, script_type: str, args: list):
                  if process.poll() is None:
                      process.kill()
 
-        if app_window and app_window.winfo_exists():
+        if app_window:
             app_window.after(100, enable_buttons)
             app_window.after(0, set_busy, False)
 
@@ -451,7 +451,7 @@ def run_image_generation_in_thread(image_path: str, description: str):
     """(新) 在背景執行緒中直接呼叫圖像生成函式"""
     script_type = "圖像"
     try:
-        if app_window and app_window.winfo_exists():
+        if app_window:
             app_window.after(0, update_status_safe, f"正在執行 {script_type} 程序...")
             app_window.after(0, update_gui_safe, result_text_widget, f"\n--- 開始執行圖像口述影像生成 ---")
         # 語音提示已在 voice_interaction_loop 中完成，此處不再重複
@@ -466,29 +466,29 @@ def run_image_generation_in_thread(image_path: str, description: str):
         # --- 成功處理 ---
         success_msg = "--- 圖像口述影像生成成功 ---"
         print(success_msg)
-        if app_window and app_window.winfo_exists():
+        if app_window:
             app_window.after(0, update_gui_safe, result_text_widget, success_msg)
             app_window.after(0, update_status_safe, f"{script_type} 完成")
         if VOICE_ENABLED: speak(f"{script_type} 處理完成", wait=True) # 等待說完
 
         if final_image_path and final_answer:
-            if app_window and app_window.winfo_exists():
+            if app_window:
                 app_window.after(0, show_image_and_text, final_image_path, final_answer)
         else:
-            if app_window and app_window.winfo_exists():
+            if app_window:
                 app_window.after(0, update_gui_safe, result_text_widget, "[提示] 未找到圖片路徑或生成結果用於顯示。")
 
     except Exception as e:
         # --- 錯誤處理 ---
         error_msg = f"執行圖像生成時發生未預期的錯誤: {e}\n{traceback.format_exc()}"
         print(error_msg)
-        if app_window and app_window.winfo_exists():
+        if app_window:
             app_window.after(0, update_gui_safe, result_text_widget, error_msg)
             app_window.after(0, update_status_safe, f"{script_type} 失敗 (未知錯誤)")
         if VOICE_ENABLED: speak(f"啟動{script_type}時發生未知錯誤", wait=True); audio.beep_error()
     finally:
         # --- 清理 ---
-        if app_window and app_window.winfo_exists():
+        if app_window:
             app_window.after(100, enable_buttons)
             app_window.after(0, set_busy, False)
             # (修改) 任務結束後，重新啟動語音互動
@@ -817,7 +817,7 @@ def preload_llama_and_db():
         return
 
     print(f"[預載入] 開始預載入 LLaMA 模型和 RAG 資料庫...")
-    if app_window and app_window.winfo_exists():
+    if app_window:
         app_window.after(0, update_status_safe, "正在預載入模型...")
 
     try:
@@ -826,20 +826,20 @@ def preload_llama_and_db():
 
         if resources:
             print("[預載入] LLaMA 模型和 RAG 資料庫預載入完成！")
-            if app_window and app_window.winfo_exists():
+            if app_window:
                 app_window.after(0, update_status_safe, "模型預載入完成，準備就緒")
                 app_window.after(0, update_gui_safe, result_text_widget, "[系統] LLaMA 模型和 RAG 資料庫已預先載入，可快速執行圖像口述影像生成。")
             _preload_completed = True
         else:
             print("[預載入] 預載入失敗。")
             _preload_error = "預載入資源返回 None"
-            if app_window and app_window.winfo_exists():
+            if app_window:
                 app_window.after(0, update_status_safe, "模型預載入失敗")
     except Exception as e:
         print(f"[預載入] 發生錯誤: {e}")
         traceback.print_exc()
         _preload_error = str(e)
-        if app_window and app_window.winfo_exists():
+        if app_window:
             app_window.after(0, update_status_safe, "模型預載入發生錯誤")
             app_window.after(0, update_gui_safe, result_text_widget, f"[警告] 模型預載入失敗: {e}")
     finally:
@@ -862,7 +862,7 @@ def start_voice_interaction_thread():
 
 def voice_interaction_loop():
     """(修改) 語音互動迴圈，執行一次指令後即結束"""
-    if not VOICE_ENABLED or not app_window or not app_window.winfo_exists():
+    if not VOICE_ENABLED or not app_window:
         return
     
     # 檢查是否有其他任務正在執行
@@ -875,7 +875,7 @@ def voice_interaction_loop():
     # 詢問指令
     prompt = "請說出指令：生成圖像、生成影片、即時拍照，或 結束"
     command = voice_input(prompt)
-    if not command or not app_window.winfo_exists():
+    if not command:
         # 如果沒有指令或視窗已關閉，重新啟動自己以繼續監聽
         app_window.after(100, start_voice_interaction_thread)
         return
@@ -898,7 +898,7 @@ def voice_interaction_loop():
     elif parsed == "exit":
         speak("感謝您的使用，系統即將關閉")
         if VOICE_ENABLED: audio.beep_success()
-        if app_window and app_window.winfo_exists():
+        if app_window:
             app_window.after(0, app_window.destroy)
     else:
         speak("無法辨識指令，請重新說一次")
