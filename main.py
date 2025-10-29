@@ -137,8 +137,8 @@ class ToolTip:
              self.tipwindow = tw = tk.Toplevel(self.widget)
              try: tw.wm_overrideredirect(1)
              except Exception: pass
-             tw.configure(bg="#5E81AC")
-             label = tk.Label(tw, text=self.text, justify=tk.LEFT, background="#5E81AC",
+             tw.configure(bg="#638FA8")
+             label = tk.Label(tw, text=self.text, justify=tk.LEFT, background="#638FA8",
                               foreground="white", relief=tk.SOLID, borderwidth=1,
                               font=("Segoe UI", 9), padx=8, pady=5)
              label.pack()
@@ -776,11 +776,13 @@ def start_live_capture():
     _live_cam_window = tk.Toplevel(app_window)
     _live_cam_window.title("即時攝影機 - 準備拍照")
     _live_cam_window.geometry("640x640")
+    _live_cam_window.configure(bg="#F2D9BB")
     
-    _live_cam_label = ttk.Label(_live_cam_window, text="[正在啟動攝影機...]", anchor=tk.CENTER)
+    _live_cam_label = ttk.Label(_live_cam_window, text="[正在啟動攝影機...]", anchor=tk.CENTER, background="#F2D9BB")
     _live_cam_label.pack(expand=True, fill="both", padx=10, pady=10)
     
-    status_label = ttk.Label(_live_cam_window, text="3秒後將自動拍照", font=("Helvetica", 12, "bold"))
+    status_label = ttk.Label(_live_cam_window, text="3秒後將自動拍照", font=("Segoe UI", 12, "bold"), 
+                             foreground="#376C8B", background="#F2D9BB")
     status_label.pack(pady=5)
 
     # 綁定視窗關閉事件
@@ -950,31 +952,68 @@ def create_gui():
     # --- 應用 Sun Valley 淺色主題 ---
     sv_ttk.set_theme("light")
     
+    
+    # --- 自定義配色方案 ---
+    COLOR_BG_MAIN = "#F2D9BB"        # 主背景 - 淺米色
+    COLOR_BG_CARD = "#FFF9F0"        # 卡片背景 - 更淺的米白色
+    COLOR_PRIMARY = "#376C8B"        # 主要顏色 - 深藍色
+    COLOR_SECONDARY = "#638FA8"      # 次要顏色 - 中藍灰色
+    COLOR_ACCENT = "#FF5757"         # 強調顏色 - 珊瑚紅
+    COLOR_TEXT_DARK = "#2C3E50"      # 深色文字
+    COLOR_TEXT_LIGHT = "#FFFFFF"     # 淺色文字
     # --- 自定義樣式增強 ---
     style = ttk.Style()
     
     # 獲取主題顏色
-    bg_color = style.lookup("TLabel", "background") or "#e9e9e9"
-    fg_color = style.lookup("TLabel", "foreground") or "#121315"
+    bg_color = COLOR_BG_CARD
+    fg_color = COLOR_TEXT_DARK
+    
+    # 設定主背景色
+    root.configure(bg=COLOR_BG_MAIN)
+    
+    # 配置 Frame 背景
+    style.configure("TFrame", background=COLOR_BG_MAIN)
+    style.configure("TLabel", background=COLOR_BG_MAIN, foreground=COLOR_TEXT_DARK)
     
     # 標題樣式
-    style.configure("Header.TLabel", font=("Segoe UI", 28, "bold"))
-    style.configure("SubHeader.TLabel", font=("Segoe UI", 11))
+    style.configure("Header.TLabel", font=("Segoe UI", 28, "bold"), 
+                    foreground=COLOR_PRIMARY, background=COLOR_BG_MAIN)
+    style.configure("SubHeader.TLabel", font=("Segoe UI", 11), 
+                    foreground=COLOR_SECONDARY, background=COLOR_BG_MAIN)
     
     # 區段標題樣式
-    style.configure("SectionTitle.TLabel", font=("Segoe UI", 11, "bold"))
+    style.configure("SectionTitle.TLabel", font=("Segoe UI", 11, "bold"), 
+                    foreground=COLOR_PRIMARY, background=COLOR_BG_CARD)
     
     # 按鈕增強樣式
     style.configure("Primary.TButton", font=("Segoe UI", 12, "bold"), padding=(18, 14))
+    style.map("Primary.TButton",
+              foreground=[("!active", COLOR_TEXT_LIGHT), ("active", COLOR_TEXT_LIGHT)],
+              background=[("!active", COLOR_PRIMARY), ("active", COLOR_SECONDARY)])
+    
     style.configure("Secondary.TButton", font=("Segoe UI", 11), padding=(12, 10))
+    style.map("Secondary.TButton",
+              foreground=[("!active", COLOR_TEXT_LIGHT), ("active", COLOR_TEXT_LIGHT)],
+              background=[("!active", COLOR_SECONDARY), ("active", COLOR_PRIMARY)])
+    
     style.configure("Accent.TButton", font=("Segoe UI", 11, "bold"))
+    style.map("Accent.TButton",
+              foreground=[("!active", COLOR_TEXT_LIGHT), ("active", COLOR_TEXT_LIGHT)],
+              background=[("!active", COLOR_ACCENT), ("active", "#FF7777")])
+    
     
     # LabelFrame 樣式
-    style.configure("Card.TLabelframe", borderwidth=2, relief="solid")
-    style.configure("Card.TLabelframe.Label", font=("Segoe UI", 12, "bold"))
+    style.configure("Card.TLabelframe", borderwidth=2, relief="solid", 
+                    background=COLOR_BG_CARD, bordercolor=COLOR_SECONDARY)
+    style.configure("Card.TLabelframe.Label", font=("Segoe UI", 12, "bold"), 
+                    foreground=COLOR_PRIMARY, background=COLOR_BG_CARD)
     
     # 狀態列樣式
-    style.configure("Status.TLabel", font=("Segoe UI", 10), padding=(8, 5))
+    style.configure("Status.TLabel", font=("Segoe UI", 10), padding=(8, 5),
+                    background=COLOR_BG_MAIN, foreground=COLOR_TEXT_DARK)
+    
+    # Separator 樣式
+    style.configure("TSeparator", background=COLOR_SECONDARY)
 
 
     # --- 主要容器 ---
@@ -1027,10 +1066,13 @@ def create_gui():
     image_output_frame = ttk.LabelFrame(output_area_frame, text="📷圖像結果預覽", labelanchor="n", padding=15, style="Card.TLabelframe")
     image_output_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
     
-    image_preview_label = ttk.Label(image_output_frame, text="[此處顯示圖片預覽]", anchor=tk.CENTER)
-    image_preview_label.pack(fill="x", pady=(5, 10))
+    image_preview_label = tk.Label(image_output_frame, text="[此處顯示圖片預覽]", anchor=tk.CENTER,
+                                    bg=COLOR_BG_CARD, fg=COLOR_SECONDARY, font=("Segoe UI", 10),
+                                    relief=tk.SOLID, borderwidth=1, highlightbackground=COLOR_SECONDARY,
+                                    highlightthickness=1, padx=10, pady=40)
     
-    ttk.Label(image_output_frame, text="✍️生成的口述影像:", style="SectionTitle.TLabel").pack(anchor="w", pady=(5,2))
+    section_label = ttk.Label(image_output_frame, text="✍️生成的口述影像:", style="SectionTitle.TLabel")
+    section_label.pack(anchor="w", pady=(5,2))
     
     narration_output_widget = scrolledtext.ScrolledText(
         image_output_frame,
@@ -1038,10 +1080,13 @@ def create_gui():
         height=8,
         state=tk.DISABLED,
         font=("Segoe UI", 11),
-        relief=tk.FLAT,
-        borderwidth=0,
+        relief=tk.SOLID,
+        borderwidth=1,
         bg=bg_color,
         fg=fg_color,
+        highlightthickness=0,
+        highlightbackground=COLOR_SECONDARY,
+        highlightcolor=COLOR_SECONDARY,
     )
     narration_output_widget.pack(expand=True, fill="both", pady=(5, 0))
 
@@ -1049,8 +1094,10 @@ def create_gui():
     video_output_frame = ttk.LabelFrame(output_area_frame, text="🎬 影片結果預覽", labelanchor="n", padding=15, style="Card.TLabelframe")
     video_output_frame.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
     
-    video_preview_label = ttk.Label(video_output_frame, text="[此處顯示影片預覽]", anchor=tk.CENTER)
-    video_preview_label.pack(fill="x", pady=(5, 10))
+    video_preview_label = tk.Label(video_output_frame, text="[此處顯示影片預覽]", anchor=tk.CENTER,
+                                    bg=COLOR_BG_CARD, fg=COLOR_SECONDARY, font=("Segoe UI", 10),
+                                    relief=tk.SOLID, borderwidth=1, highlightbackground=COLOR_SECONDARY,
+                                    highlightthickness=1, padx=10, pady=40)
     
     open_external_btn = ttk.Button(video_output_frame, text="▶️ 在系統播放器中開啟", command=open_video_external, style="Accent.TButton")
     open_external_btn.pack(pady=(5, 5))
@@ -1082,6 +1129,10 @@ def create_gui():
     status_bar = ttk.Label(status_frame, textvariable=status_label_var, anchor=tk.W, style="Status.TLabel")
     status_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
     
+    
+    # Progressbar 樣式
+    style.configure("TProgressbar", troughcolor=COLOR_BG_CARD, background=COLOR_SECONDARY, 
+                    bordercolor=COLOR_SECONDARY, lightcolor=COLOR_PRIMARY, darkcolor=COLOR_PRIMARY)
     progress_bar = ttk.Progressbar(root, mode="indeterminate")
 
     # --- 啟動 GUI 佇列處理 ---
