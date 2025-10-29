@@ -1,0 +1,31 @@
+# UI Theme
+sv-ttk>=2.6.0
+
+# Computer Vision & Image Processing
+opencv-python>=4.8.0
+Pillow>=10.0.0
+
+# Machine Learning & AI
+torch>=2.0.0
+transformers>=4.30.0
+
+# LangChain & RAG
+langchain>=0.1.0
+chromadb>=0.4.0
+
+# Video Processing
+scenedetect>=0.6.0
+moviepy>=1.0.3
+
+# Google AI
+google-generativeai>=0.3.0
+
+# Audio & Speech
+edge-tts>=6.1.0
+openai-whisper>=20230918
+SpeechRecognition>=3.10.0
+pygame>=2.5.0
+mutagen>=1.47.0
+
+# Utilities
+python-dotenv>=1.0.0
