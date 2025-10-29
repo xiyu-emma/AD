@@ -193,7 +193,7 @@ def show_image_and_text(image_path: str, narration_text: str):
     # 顯示圖片
     try:
         img = Image.open(image_path)
-        max_w, max_h = 480, 360
+        max_w, max_h = 640, 360
         img.thumbnail((max_w, max_h), Image.LANCZOS)
         _current_image_tk = ImageTk.PhotoImage(img)
         image_preview_label.config(image=_current_image_tk)
@@ -942,8 +942,17 @@ def create_gui():
     root = tk.Tk()
     app_window = root
     root.title("口述影像生成系統")
-    root.geometry("1000x780")
-    root.minsize(900, 680)
+    root.geometry("1200x900")
+    root.minsize(1000, 800)
+    
+    # 啟動時最大化視窗
+    try:
+        root.state('zoomed')  # Windows
+    except:
+        try:
+            root.attributes('-zoomed', True)  # Linux
+        except:
+            pass  # macOS 會使用 geometry 設定
 
     # --- 主題與色彩 (白色＋淺藍色主題) ---
     style = ttk.Style()
@@ -957,26 +966,26 @@ def create_gui():
     style.configure("TFrame", background=THEME_BG)
     style.configure("Main.TFrame", background=THEME_BG)
     style.configure("Card.TFrame", background=THEME_CARD_BG)
-    style.configure("TLabel", background=THEME_BG, foreground=THEME_TEXT, font=("Helvetica", 10))
-    style.configure("Header.TLabel", background=THEME_BG, foreground=THEME_TEXT, font=("Helvetica", 22, "bold"))
-    style.configure("SubHeader.TLabel", background=THEME_BG, foreground=THEME_MUTED, font=("Helvetica", 11))
-    style.configure("Card.TLabelframe", background=THEME_CARD_BG, foreground=THEME_TEXT, bordercolor=THEME_BORDER, relief=tk.SOLID, borderwidth=1)
-    style.configure("Card.TLabelframe.Label", background=THEME_CARD_BG, foreground=THEME_MUTED, font=("Helvetica", 11, "bold"))
-    style.configure("SectionTitle.TLabel", background=THEME_CARD_BG, foreground=THEME_MUTED, font=("Helvetica", 10, "bold"))
-    style.configure("TButton", font=("Helvetica", 12), padding=(14, 10), borderwidth=0)
+    style.configure("TLabel", background=THEME_BG, foreground=THEME_TEXT, font=("Helvetica", 12))
+    style.configure("Header.TLabel", background=THEME_BG, foreground=THEME_TEXT, font=("Helvetica", 28, "bold"))
+    style.configure("SubHeader.TLabel", background=THEME_BG, foreground=THEME_MUTED, font=("Helvetica", 14))
+    style.configure("Card.TLabelframe", background=THEME_CARD_BG, foreground=THEME_TEXT, bordercolor=THEME_BORDER, relief=tk.SOLID, borderwidth=2)
+    style.configure("Card.TLabelframe.Label", background=THEME_CARD_BG, foreground=THEME_MUTED, font=("Helvetica", 13, "bold"))
+    style.configure("SectionTitle.TLabel", background=THEME_CARD_BG, foreground=THEME_MUTED, font=("Helvetica", 12, "bold"))
+    style.configure("TButton", font=("Helvetica", 14, "bold"), padding=(18, 14), borderwidth=0)
     style.configure("Primary.TButton", background=THEME_ACCENT, foreground="white", relief=tk.FLAT)
     style.map("Primary.TButton", background=[("active", THEME_ACCENT_HOVER), ("disabled", "#BBDFFB")], foreground=[("disabled", "#E2E8F0")])
     style.configure("Secondary.TButton", background="#E1F3FF", foreground=THEME_TEXT, relief=tk.FLAT)
     style.map("Secondary.TButton", background=[("active", "#CDE9FF")])
     style.configure("Warning.TButton", background="#F87171", foreground="white", relief=tk.FLAT)
     style.map("Warning.TButton", background=[("active", "#EF4444"), ("disabled", "#FBCFE8")], foreground=[("disabled", "#F3F4F6")])
-    style.configure("Preview.TLabel", background=THEME_PREVIEW_BG, foreground=THEME_MUTED, font=("Helvetica", 10))
-    style.configure("Status.TLabel", background="#E1F3FF", foreground=THEME_TEXT, font=("Consolas", 9))
+    style.configure("Preview.TLabel", background=THEME_PREVIEW_BG, foreground=THEME_MUTED, font=("Helvetica", 12))
+    style.configure("Status.TLabel", background="#E1F3FF", foreground=THEME_TEXT, font=("Consolas", 11))
     style.configure("Horizontal.TProgressbar", troughcolor=THEME_TROUGH, background=THEME_ACCENT)
 
 
     # --- 主要容器 ---
-    main_frame = ttk.Frame(root, padding=24, style="Main.TFrame")
+    main_frame = ttk.Frame(root, padding=28, style="Main.TFrame")
     main_frame.pack(expand=True, fill="both")
 
     # --- 標題區 ---
@@ -1009,17 +1018,24 @@ def create_gui():
     # --- 視覺輸出區 ---
     output_area_frame = ttk.Frame(main_frame, style="Main.TFrame")
     output_area_frame.pack(expand=True, fill="both", pady=10)
+    
+    # 使用 grid 佈局確保兩個預覽區域完全平分空間
+    output_area_frame.columnconfigure(0, weight=1, uniform="preview")
+    output_area_frame.columnconfigure(1, weight=1, uniform="preview")
+    output_area_frame.rowconfigure(0, weight=1)
+    
+    # 圖像結果預覽 - 左半邊
     image_output_frame = ttk.LabelFrame(output_area_frame, text="圖像結果預覽", labelanchor="n", padding=15, style="Card.TLabelframe")
-    image_output_frame.pack(side="left", expand=True, fill="both", padx=(0, 10), ipadx=10)
+    image_output_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
     image_preview_label = ttk.Label(image_output_frame, text="[此處顯示圖片預覽]", anchor=tk.CENTER, style="Preview.TLabel")
     image_preview_label.pack(fill="x", pady=(5, 10))
     ttk.Label(image_output_frame, text="生成的口述影像:", style="SectionTitle.TLabel").pack(anchor="w", pady=(5,2))
     narration_output_widget = scrolledtext.ScrolledText(
         image_output_frame,
         wrap=tk.WORD,
-        height=6,
+        height=8,
         state=tk.DISABLED,
-        font=("Helvetica", 10),
+        font=("Helvetica", 12),
         relief=tk.SOLID,
         borderwidth=1,
         bd=1,
@@ -1028,8 +1044,9 @@ def create_gui():
     )
     narration_output_widget.pack(expand=True, fill="both")
 
+    # 影片結果預覽 - 右半邊
     video_output_frame = ttk.LabelFrame(output_area_frame, text="影片結果預覽", labelanchor="n", padding=15, style="Card.TLabelframe")
-    video_output_frame.pack(side="left", expand=True, fill="both", padx=(10, 0), ipadx=10)
+    video_output_frame.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
     video_preview_label = ttk.Label(video_output_frame, text="[此處顯示影片預覽]", anchor=tk.CENTER, style="Preview.TLabel")
     video_preview_label.pack(fill="x", pady=(5, 10))
     open_external_btn = ttk.Button(video_output_frame, text="▶️ 在系統播放器中開啟", command=open_video_external, style="Secondary.TButton")
