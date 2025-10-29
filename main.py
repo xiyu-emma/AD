@@ -989,12 +989,12 @@ def create_gui():
     style.configure("Primary.TButton", 
                     font=("Segoe UI", 12, "bold"), 
                     padding=(18, 14),
-                    foreground=COLOR_TEXT_LIGHT,
+                    foreground=COLOR_TEXT_DARK,
                     background=COLOR_PRIMARY,
                     borderwidth=0,
                     relief="flat")
     style.map("Primary.TButton",
-              foreground=[("!active", COLOR_TEXT_LIGHT), ("pressed", COLOR_TEXT_LIGHT), ("active", COLOR_TEXT_LIGHT), ("hover", COLOR_TEXT_LIGHT)],
+              foreground=[("!active", COLOR_TEXT_DARK), ("pressed", COLOR_TEXT_DARK), ("active", COLOR_TEXT_DARK), ("hover", COLOR_TEXT_DARK)],
               background=[("!active", COLOR_PRIMARY), ("pressed", COLOR_SECONDARY), ("active", COLOR_SECONDARY), ("hover", COLOR_SECONDARY)])
     
     style.configure("Secondary.TButton", 
@@ -1041,10 +1041,12 @@ def create_gui():
     header_frame = ttk.Frame(main_frame)
     header_frame.pack(fill="x", pady=(0, 20))
     
-    header_label = ttk.Label(header_frame, text="🎙️口述影像生成系統", style="Header.TLabel")
-    header_label.pack(anchor="w")
-    subheader_label = ttk.Label(header_frame, text="為視障者生成圖像與影片的口述影像旁白 - AI-Powered Audio Description Generator", style="SubHeader.TLabel")
-    subheader_label.pack(anchor="w", pady=(5, 0))
+    header_label = tk.Label(header_frame, text="🎙️口述影像生成系統",
+                           font=("Segoe UI", 28, "bold"), fg=COLOR_PRIMARY, bg=COLOR_BG_MAIN)
+    header_label.pack(anchor="w", fill="x")
+    subheader_label = tk.Label(header_frame, text="為視障者生成圖像與影片的口述影像旁白 - AI-Powered Audio Description Generator",
+                              font=("Segoe UI", 11), fg=COLOR_SECONDARY, bg=COLOR_BG_MAIN)
+    subheader_label.pack(anchor="w", fill="x", pady=(5, 0))
     
     separator = ttk.Separator(header_frame, orient="horizontal")
     separator.pack(fill="x", pady=(15, 0))
@@ -1053,15 +1055,24 @@ def create_gui():
     btn_frame = ttk.Frame(main_frame)
     btn_frame.pack(fill="x", pady=(15, 20))
     
-    image_button = ttk.Button(btn_frame, text="🖼️生成圖像口述影像", command=start_image_analysis, style="Primary.TButton")
-    image_button.pack(side="left", expand=True, fill="x", padx=(0, 6)) # 修改 padding
+    image_button = tk.Button(btn_frame, text="🖼️生成圖像口述影像", command=start_image_analysis,
+                             font=("Segoe UI", 12, "bold"), bg=COLOR_PRIMARY, fg=COLOR_TEXT_LIGHT,
+                             activebackground=COLOR_SECONDARY, activeforeground=COLOR_TEXT_LIGHT,
+                             relief=tk.FLAT, borderwidth=0, padx=18, pady=14, cursor="hand2")
+    image_button.pack(side="left", expand=True, fill="x", padx=(0, 6))
     
-    video_button = ttk.Button(btn_frame, text="🎬生成口述影像旁白", command=start_video_analysis, style="Primary.TButton")
-    video_button.pack(side="left", expand=True, fill="x", padx=6) # 修改 padding
+    video_button = tk.Button(btn_frame, text="🎬生成口述影像旁白", command=start_video_analysis,
+                             font=("Segoe UI", 12, "bold"), bg=COLOR_PRIMARY, fg=COLOR_TEXT_LIGHT,
+                             activebackground=COLOR_SECONDARY, activeforeground=COLOR_TEXT_LIGHT,
+                             relief=tk.FLAT, borderwidth=0, padx=18, pady=14, cursor="hand2")
+    video_button.pack(side="left", expand=True, fill="x", padx=6)
     
     # 新增按鈕
-    live_button = ttk.Button(btn_frame, text="📸生成即時口述影像", command=start_live_capture, style="Primary.TButton")
-    live_button.pack(side="left", expand=True, fill="x", padx=(6, 0)) # 修改 padding
+    live_button = tk.Button(btn_frame, text="📸生成即時口述影像", command=start_live_capture,
+                            font=("Segoe UI", 12, "bold"), bg=COLOR_PRIMARY, fg=COLOR_TEXT_LIGHT,
+                            activebackground=COLOR_SECONDARY, activeforeground=COLOR_TEXT_LIGHT,
+                            relief=tk.FLAT, borderwidth=0, padx=18, pady=14, cursor="hand2")
+    live_button.pack(side="left", expand=True, fill="x", padx=(6, 0))
 
     # --- 工具提示 (修改) ---
     try:
