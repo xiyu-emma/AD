@@ -986,20 +986,37 @@ def create_gui():
                     foreground=COLOR_PRIMARY, background=COLOR_BG_CARD)
     
     # 按鈕增強樣式
-    style.configure("Primary.TButton", font=("Segoe UI", 12, "bold"), padding=(18, 14))
+    style.configure("Primary.TButton", 
+                    font=("Segoe UI", 12, "bold"), 
+                    padding=(18, 14),
+                    foreground=COLOR_TEXT_LIGHT,
+                    background=COLOR_PRIMARY,
+                    borderwidth=0,
+                    relief="flat")
     style.map("Primary.TButton",
-              foreground=[("!active", COLOR_TEXT_LIGHT), ("active", COLOR_TEXT_LIGHT)],
-              background=[("!active", COLOR_PRIMARY), ("active", COLOR_SECONDARY)])
+              foreground=[("!active", COLOR_TEXT_LIGHT), ("pressed", COLOR_TEXT_LIGHT), ("active", COLOR_TEXT_LIGHT), ("hover", COLOR_TEXT_LIGHT)],
+              background=[("!active", COLOR_PRIMARY), ("pressed", COLOR_SECONDARY), ("active", COLOR_SECONDARY), ("hover", COLOR_SECONDARY)])
     
-    style.configure("Secondary.TButton", font=("Segoe UI", 11), padding=(12, 10))
+    style.configure("Secondary.TButton", 
+                    font=("Segoe UI", 11), 
+                    padding=(12, 10),
+                    foreground=COLOR_TEXT_LIGHT,
+                    background=COLOR_SECONDARY,
+                    borderwidth=0,
+                    relief="flat")
     style.map("Secondary.TButton",
-              foreground=[("!active", COLOR_TEXT_LIGHT), ("active", COLOR_TEXT_LIGHT)],
-              background=[("!active", COLOR_SECONDARY), ("active", COLOR_PRIMARY)])
+              foreground=[("!active", COLOR_TEXT_LIGHT), ("pressed", COLOR_TEXT_LIGHT), ("active", COLOR_TEXT_LIGHT), ("hover", COLOR_TEXT_LIGHT)],
+              background=[("!active", COLOR_SECONDARY), ("pressed", COLOR_PRIMARY), ("active", COLOR_PRIMARY), ("hover", COLOR_PRIMARY)])
     
-    style.configure("Accent.TButton", font=("Segoe UI", 11, "bold"))
+    style.configure("Accent.TButton", 
+                    font=("Segoe UI", 11, "bold"),
+                    foreground=COLOR_TEXT_LIGHT,
+                    background=COLOR_ACCENT,
+                    borderwidth=0,
+                    relief="flat")
     style.map("Accent.TButton",
-              foreground=[("!active", COLOR_TEXT_LIGHT), ("active", COLOR_TEXT_LIGHT)],
-              background=[("!active", COLOR_ACCENT), ("active", "#FF7777")])
+              foreground=[("!active", COLOR_TEXT_LIGHT), ("pressed", COLOR_TEXT_LIGHT), ("active", COLOR_TEXT_LIGHT), ("hover", COLOR_TEXT_LIGHT)],
+              background=[("!active", COLOR_ACCENT), ("pressed", "#FF7777"), ("active", "#FF7777"), ("hover", "#FF7777")])
     
     
     # LabelFrame 樣式
@@ -1070,6 +1087,7 @@ def create_gui():
                                     bg=COLOR_BG_CARD, fg=COLOR_SECONDARY, font=("Segoe UI", 10),
                                     relief=tk.SOLID, borderwidth=1, highlightbackground=COLOR_SECONDARY,
                                     highlightthickness=1, padx=10, pady=40)
+    image_preview_label.pack(expand=True, fill="both", pady=(0, 10))
     
     section_label = ttk.Label(image_output_frame, text="✍️生成的口述影像:", style="SectionTitle.TLabel")
     section_label.pack(anchor="w", pady=(5,2))
@@ -1098,6 +1116,7 @@ def create_gui():
                                     bg=COLOR_BG_CARD, fg=COLOR_SECONDARY, font=("Segoe UI", 10),
                                     relief=tk.SOLID, borderwidth=1, highlightbackground=COLOR_SECONDARY,
                                     highlightthickness=1, padx=10, pady=40)
+    video_preview_label.pack(expand=True, fill="both", pady=(0, 10))
     
     open_external_btn = ttk.Button(video_output_frame, text="▶️ 在系統播放器中開啟", command=open_video_external, style="Accent.TButton")
     open_external_btn.pack(pady=(5, 5))
