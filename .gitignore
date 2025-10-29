@@ -2,3 +2,12 @@ __pycache__/
 *.pyc
 .DS_Store
 ttsapi.txt
+api_key.txt
+models/
+captures/
+output/
+*.mp4
+*.wav
+*.mp3
+chroma_db/
+temp_theme/
