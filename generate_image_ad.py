@@ -391,6 +391,25 @@ def generate_narration(model_path: str, image_file: str, user_desc: str, *, incl
     return response_text, final_image_path
 
 
+def generate_narration_from_preloaded(image_file: str, user_desc: str) -> Tuple[str, str]:
+    """
+    (新函式) 使用已預載入的資源生成口述影像。
+    如果資源未載入，則會引發 RuntimeError。
+    """
+    global _cached_resources
+    with _resources_lock:
+        if not _cached_resources:
+            raise RuntimeError("模型資源尚未預載入，無法執行生成。")
+        # 確保我們使用的是快取中的資源
+        resources = _cached_resources
+
+    # 呼叫核心生成邏輯
+    response_text = _generate_narration_with_resources(resources, image_file, user_desc)
+    final_image_path = os.path.abspath(image_file)
+
+    return response_text, final_image_path
+
+
 def run_single_image_narration(model_path: str, image_file: str, user_desc: str):
     response_text, _ = generate_narration(model_path, image_file, user_desc, include_final_markers=True)
     return response_text
