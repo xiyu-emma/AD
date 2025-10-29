@@ -396,6 +396,9 @@ def run_script_in_thread(script_name: str, script_type: str, args: list):
         if app_window and app_window.winfo_exists():
             app_window.after(100, enable_buttons)
             app_window.after(0, set_busy, False)
+            # (新增) 任務結束後，重新啟動語音互動
+            if VOICE_ENABLED:
+                app_window.after(200, start_voice_interaction_thread)
 
 def enable_buttons():
     """重新啟用主按鈕 (加入檢查)"""
@@ -898,7 +901,7 @@ def voice_interaction_loop():
         app_window.after(0, lambda: start_image_analysis(is_voice_command=True))
         action_triggered = True
     elif parsed == "video":
-        speak("正在啟動影片口述影像生成程序。", wait=True)
+        speak("正在啟動影片口述影像生成程序，請稍後片刻。", wait=True)
         app_window.after(0, start_video_analysis)
         action_triggered = True
     elif parsed == "live" or "拍照" in command:
@@ -951,8 +954,8 @@ def create_gui():
     style = ttk.Style()
     
     # 獲取主題顏色
-    bg_color = style.lookup("TLabel", "background") or "#fafafa"
-    fg_color = style.lookup("TLabel", "foreground") or "#1c1c1c"
+    bg_color = style.lookup("TLabel", "background") or "#e9e9e9"
+    fg_color = style.lookup("TLabel", "foreground") or "#121315"
     
     # 標題樣式
     style.configure("Header.TLabel", font=("Segoe UI", 28, "bold"))
@@ -982,7 +985,7 @@ def create_gui():
     header_frame = ttk.Frame(main_frame)
     header_frame.pack(fill="x", pady=(0, 20))
     
-    header_label = ttk.Label(header_frame, text="🎙️ 口述影像生成系統", style="Header.TLabel")
+    header_label = ttk.Label(header_frame, text="🎙️口述影像生成系統", style="Header.TLabel")
     header_label.pack(anchor="w")
     subheader_label = ttk.Label(header_frame, text="為視障者生成圖像與影片的口述影像旁白 - AI-Powered Audio Description Generator", style="SubHeader.TLabel")
     subheader_label.pack(anchor="w", pady=(5, 0))
@@ -994,14 +997,14 @@ def create_gui():
     btn_frame = ttk.Frame(main_frame)
     btn_frame.pack(fill="x", pady=(15, 20))
     
-    image_button = ttk.Button(btn_frame, text="🖼️ 生成圖像口述影像", command=start_image_analysis, style="Primary.TButton")
+    image_button = ttk.Button(btn_frame, text="🖼️生成圖像口述影像", command=start_image_analysis, style="Primary.TButton")
     image_button.pack(side="left", expand=True, fill="x", padx=(0, 6)) # 修改 padding
     
-    video_button = ttk.Button(btn_frame, text="🎬 生成口述影像旁白", command=start_video_analysis, style="Primary.TButton")
+    video_button = ttk.Button(btn_frame, text="🎬生成口述影像旁白", command=start_video_analysis, style="Primary.TButton")
     video_button.pack(side="left", expand=True, fill="x", padx=6) # 修改 padding
     
     # 新增按鈕
-    live_button = ttk.Button(btn_frame, text="📸 生成即時口述影像", command=start_live_capture, style="Primary.TButton")
+    live_button = ttk.Button(btn_frame, text="📸生成即時口述影像", command=start_live_capture, style="Primary.TButton")
     live_button.pack(side="left", expand=True, fill="x", padx=(6, 0)) # 修改 padding
 
     # --- 工具提示 (修改) ---
@@ -1021,13 +1024,13 @@ def create_gui():
     output_area_frame.rowconfigure(0, weight=1)
     
     # 圖像結果預覽 - 左半邊
-    image_output_frame = ttk.LabelFrame(output_area_frame, text="📷 圖像結果預覽", labelanchor="n", padding=15, style="Card.TLabelframe")
+    image_output_frame = ttk.LabelFrame(output_area_frame, text="📷圖像結果預覽", labelanchor="n", padding=15, style="Card.TLabelframe")
     image_output_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
     
     image_preview_label = ttk.Label(image_output_frame, text="[此處顯示圖片預覽]", anchor=tk.CENTER)
     image_preview_label.pack(fill="x", pady=(5, 10))
     
-    ttk.Label(image_output_frame, text="✍️ 生成的口述影像:", style="SectionTitle.TLabel").pack(anchor="w", pady=(5,2))
+    ttk.Label(image_output_frame, text="✍️生成的口述影像:", style="SectionTitle.TLabel").pack(anchor="w", pady=(5,2))
     
     narration_output_widget = scrolledtext.ScrolledText(
         image_output_frame,
@@ -1054,22 +1057,22 @@ def create_gui():
     try: ToolTip(open_external_btn, "使用系統預設播放器開啟生成的影片檔案")
     except Exception: pass
 
-    # --- 執行日誌輸出區 ---
-    log_frame = ttk.LabelFrame(main_frame, text="📋 執行日誌", labelanchor="n", padding=15, style="Card.TLabelframe")
-    log_frame.pack(fill="both", pady=(10, 0), ipady=5)
+    # --- 執行日誌輸出區 (已根據要求移除) ---
+    # log_frame = ttk.LabelFrame(main_frame, text="📋 執行日誌", labelanchor="n", padding=15, style="Card.TLabelframe")
+    # log_frame.pack(fill="both", pady=(10, 0), ipady=5)
     
-    result_text_widget = scrolledtext.ScrolledText(
-        log_frame,
-        wrap=tk.WORD,
-        height=8,
-        state=tk.DISABLED,
-        font=("Consolas", 9),
-        relief=tk.FLAT,
-        borderwidth=0,
-        bg=bg_color,
-        fg=fg_color,
-    )
-    result_text_widget.pack(expand=True, fill="both")
+    # result_text_widget = scrolledtext.ScrolledText(
+    #     log_frame,
+    #     wrap=tk.WORD,
+    #     height=8,
+    #     state=tk.DISABLED,
+    #     font=("Consolas", 9),
+    #     relief=tk.FLAT,
+    #     borderwidth=0,
+    #     bg=bg_color,
+    #     fg=fg_color,
+    # )
+    # result_text_widget.pack(expand=True, fill="both")
 
     # --- 狀態列與進度列 ---
     status_frame = ttk.Frame(root, relief=tk.FLAT, padding=(0, 2))
