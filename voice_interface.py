@@ -17,6 +17,15 @@ from functools import lru_cache
 from typing import Optional
 import requests
 
+# --- 客製化語音系統 ---
+try:
+    from custom_voice import custom_voice_system
+    CUSTOM_VOICE_ENABLED = True
+except ImportError:
+    print("[警告] custom_voice.py 未找到，客製化語音功能將被禁用。")
+    CUSTOM_VOICE_ENABLED = False
+    custom_voice_system = None
+
 # --- Azure TTS 整合開始 ---
 
 AZURE_TTS_REGION = "eastasia"
@@ -231,12 +240,30 @@ def detect_language(text):
     return "en-US" if english_chars > chinese_chars else "zh-TW"
 
 def speak(text, wait=True):
-    """增強版語音輸出，包含錯誤處理和事件迴圈兼容"""
+    """增強版語音輸出，包含客製化語音支援和錯誤處理"""
     if not text or not text.strip(): return
     if not pygame.mixer.get_init():
         print("[錯誤] Pygame mixer 未初始化，無法播放語音。")
         return
 
+    # 嘗試使用客製化語音
+    if CUSTOM_VOICE_ENABLED and custom_voice_system:
+        custom_voice_file = _get_custom_voice_file(text)
+        if custom_voice_file and os.path.exists(custom_voice_file):
+            # 播放客製化語音檔案
+            try:
+                pygame.mixer.music.load(custom_voice_file)
+                pygame.mixer.music.set_volume(voice_ux.volume)
+                pygame.mixer.music.play()
+                
+                if wait:
+                    while pygame.mixer.get_init() and pygame.mixer.music.get_busy():
+                        time.sleep(0.1)
+                return
+            except Exception as e:
+                print(f"播放客製化語音失敗，回退到 TTS: {e}")
+
+    # 回退到原本的 TTS 系統
     speech_rate = voice_ux.speech_rate
     lang_code = detect_language(text)
     voice = LANG_CONFIG[lang_code]["voice"]
@@ -313,6 +340,27 @@ def speak(text, wait=True):
         except Exception as e:
             print(f"執行 asyncio.run 時出錯: {e}")
 
+
+def _get_custom_voice_file(text: str) -> Optional[str]:
+    """根據文字內容決定使用哪個客製化語音檔案"""
+    if not CUSTOM_VOICE_ENABLED or not custom_voice_system:
+        return None
+    
+    text_lower = text.lower()
+    
+    # 根據關鍵字決定語音檔案類型
+    if any(keyword in text_lower for keyword in ["歡迎", "使用", "您好", "hello", "welcome"]):
+        return custom_voice_system.get_voice_file("hello")
+    elif any(keyword in text_lower for keyword in ["準備就緒", "系統", "初始化", "ready"]):
+        return custom_voice_system.get_voice_file("system_ready")
+    elif any(keyword in text_lower for keyword in ["正在", "處理", "生成", "processing"]):
+        return custom_voice_system.get_voice_file("processing")
+    elif any(keyword in text_lower for keyword in ["完成", "成功", "已", "completed", "success"]):
+        return custom_voice_system.get_voice_file("completed")
+    elif any(keyword in text_lower for keyword in ["錯誤", "失敗", "無法", "error", "failure"]):
+        return custom_voice_system.get_voice_file("error")
+    
+    return None
 
 
 def voice_input(prompt, timeout=15):
