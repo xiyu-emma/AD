@@ -11,3 +11,5 @@ output/
 *.mp3
 chroma_db/
 temp_theme/
+voice_clones/
+temp_audio/

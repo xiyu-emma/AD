@@ -30,15 +30,15 @@ except ImportError:
     VoiceCommands = DummyVoiceCommands()
 # --- 語音功能結束 ---
 
-# --- 客製化語音功能 ---
+# --- 語音克隆功能 ---
 try:
-    from custom_voice import custom_voice_system
-    CUSTOM_VOICE_ENABLED = True
+    from voice_cloning import voice_cloning_system, XTTS_AVAILABLE
+    VOICE_CLONING_ENABLED = XTTS_AVAILABLE
 except ImportError:
-    print("[警告] custom_voice.py 未找到，客製化語音功能將被禁用。")
-    CUSTOM_VOICE_ENABLED = False
-    custom_voice_system = None
-# --- 客製化語音功能結束 ---
+    print("[警告] voice_cloning.py 未找到或 TTS 庫未安裝，語音克隆功能將被禁用。")
+    VOICE_CLONING_ENABLED = False
+    voice_cloning_system = None
+# --- 語音克隆功能結束 ---
 
 # --- 全域變數 ---
 result_text_widget = None
@@ -47,7 +47,7 @@ app_window = None
 image_button = None
 video_button = None
 live_button = None # 新增
-custom_voice_button = None # 新增：客製化語音按鈕
+voice_cloning_button = None # 新增：語音克隆按鈕
 image_preview_label = None
 narration_output_widget = None
 video_preview_label = None
@@ -412,27 +412,26 @@ def run_script_in_thread(script_name: str, script_type: str, args: list):
                 app_window.after(200, start_voice_interaction_thread)
 
 # --- 客製化語音功能函式 ---
-def open_custom_voice_dialog():
-    """開啟客製化語音設定對話框"""
-    if not CUSTOM_VOICE_ENABLED:
-        messagebox.showerror("功能未啟用", "客製化語音功能未啟用，請檢查 custom_voice.py 檔案")
+def open_voice_cloning_dialog():
+    """開啟語音克隆設定對話框"""
+    if not VOICE_CLONING_ENABLED:
+        messagebox.showerror("功能未啟用", "語音克隆功能未啟用，請檢查 TTS 庫是否已安裝")
         return
     
-    dialog = CustomVoiceDialog(app_window)
+    dialog = VoiceCloningDialog(app_window)
     dialog.wait_window()
 
-class CustomVoiceDialog:
-    """客製化語音設定對話框"""
+class VoiceCloningDialog:
+    """語音克隆設定對話框"""
     def __init__(self, parent):
         self.parent = parent
         self.current_profile = None
         self.recording = False
         self.current_recording_path = None
-        self.profile_name = None
         
         self.window = tk.Toplevel(parent)
-        self.window.title("🎙️ 客製化語音設定")
-        self.window.geometry("600x500")
+        self.window.title("🎙️ 語音克隆設定")
+        self.window.geometry("600x400")
         self.window.configure(bg="#F2D9BB")
         self.window.transient(parent)
         self.window.grab_set()
@@ -449,14 +448,14 @@ class CustomVoiceDialog:
     def create_widgets(self):
         """創建對話框元件"""
         # 標題
-        title_label = tk.Label(self.window, text="🎙️ 客製化語音設定", 
+        title_label = tk.Label(self.window, text="🎙️ 語音克隆設定", 
                               font=("Segoe UI", 16, "bold"), 
                               fg="#376C8B", bg="#F2D9BB")
         title_label.pack(pady=20)
         
         # 說明文字
         desc_label = tk.Label(self.window, 
-                            text="錄製您的聲音來替換系統的預設語音提示\n您需要錄製5個基本語音樣本",
+                            text="錄製您的聲音作為參考，系統將克隆您的音色進行 TTS 合成\n只需錄製一段自然的語音即可",
                             font=("Segoe UI", 10), 
                             fg="#638FA8", bg="#F2D9BB")
         desc_label.pack(pady=(0, 20))
@@ -469,11 +468,11 @@ class CustomVoiceDialog:
         left_frame = ttk.Frame(main_frame, style="Dialog.TFrame")
         left_frame.pack(side="left", expand=True, fill="both", padx=(0, 10))
         
-        profile_label = ttk.Label(left_frame, text="語音設定檔", style="Dialog.TLabel")
+        profile_label = ttk.Label(left_frame, text="語音克隆檔案", style="Dialog.TLabel")
         profile_label.pack(anchor="w", pady=(0, 5))
         
         # 設定檔列表
-        self.profile_listbox = tk.Listbox(left_frame, height=6, font=("Segoe UI", 10))
+        self.profile_listbox = tk.Listbox(left_frame, height=8, font=("Segoe UI", 10))
         self.profile_listbox.pack(fill="both", expand=True, pady=(0, 10))
         self.profile_listbox.bind('<<ListboxSelect>>', self.on_profile_select)
         
@@ -481,9 +480,9 @@ class CustomVoiceDialog:
         profile_btn_frame = ttk.Frame(left_frame, style="Dialog.TFrame")
         profile_btn_frame.pack(fill="x")
         
-        ttk.Button(profile_btn_frame, text="新增設定檔", 
+        ttk.Button(profile_btn_frame, text="新增克隆", 
                   command=self.create_new_profile).pack(side="left", padx=(0, 5))
-        ttk.Button(profile_btn_frame, text="刪除設定檔", 
+        ttk.Button(profile_btn_frame, text="刪除", 
                   command=self.delete_profile).pack(side="left")
         ttk.Button(profile_btn_frame, text="設為預設", 
                   command=self.set_as_default).pack(side="left", padx=(5, 0))
@@ -492,51 +491,25 @@ class CustomVoiceDialog:
         right_frame = ttk.Frame(main_frame, style="Dialog.TFrame")
         right_frame.pack(side="right", expand=True, fill="both", padx=(10, 0))
         
-        recording_label = ttk.Label(right_frame, text="語音樣本錄製", style="Dialog.TLabel")
+        recording_label = ttk.Label(right_frame, text="參考音頻錄製", style="Dialog.TLabel")
         recording_label.pack(anchor="w", pady=(0, 5))
         
-        # 錄音項目列表
-        self.recording_items = [
-            ("歡迎語音", "hello", "請說：歡迎使用口述影像生成系統"),
-            ("系統就緒", "system_ready", "請說：系統準備就緒"),
-            ("處理中", "processing", "請說：正在處理中"),
-            ("完成提示", "completed", "請說：處理完成"),
-            ("錯誤提示", "error", "請說：發生錯誤")
-        ]
+        # 錄音狀態
+        self.record_status_label = ttk.Label(right_frame, text="未錄製", 
+                                            style="Dialog.TLabel", foreground="#999")
+        self.record_status_label.pack(anchor="w", pady=(0, 10))
         
-        # 錄音項目框架
-        self.recording_frame = ttk.Frame(right_frame, style="Dialog.TFrame")
-        self.recording_frame.pack(fill="both", expand=True, pady=(0, 10))
-        
-        self.recording_buttons = []
-        self.recording_status = []
-        
-        for i, (name, key, prompt) in enumerate(self.recording_items):
-            item_frame = ttk.Frame(self.recording_frame, style="Dialog.TFrame")
-            item_frame.pack(fill="x", pady=2)
-            
-            # 項目名稱
-            name_label = ttk.Label(item_frame, text=name, width=12, style="Dialog.TLabel")
-            name_label.pack(side="left")
-            
-            # 錄音按鈕
-            btn = ttk.Button(item_frame, text="🎤 錄音", width=12,
-                           command=lambda k=key, p=prompt: self.toggle_recording(k, p))
-            btn.pack(side="left", padx=(10, 5))
-            self.recording_buttons.append(btn)
-            
-            # 狀態標籤
-            status_label = ttk.Label(item_frame, text="未錄製", width=8, 
-                                   style="Dialog.TLabel", foreground="#999")
-            status_label.pack(side="left")
-            self.recording_status.append(status_label)
+        # 錄音按鈕
+        self.record_button = ttk.Button(right_frame, text="🎤 開始錄音",
+                                       command=self.toggle_recording, width=20)
+        self.record_button.pack(pady=5)
         
         # 錄音說明
         info_label = ttk.Label(right_frame, 
-                             text="選擇一個設定檔後，點擊錄音按鈕開始錄製\n錄製時請清晰說出提示文字",
+                             text="請選擇或創建克隆設定檔\n\n錄製時：\n• 請自然地說 2-5 秒的語音\n• 語音內容可以是任何文字\n• 清晰的發音效果最好",
                              font=("Segoe UI", 9), 
-                             fg="#638FA8", bg="#F2D9BB")
-        info_label.pack(pady=(10, 0))
+                             fg="#638FA8", bg="#F2D9BB", justify="left")
+        info_label.pack(pady=10, padx=5)
         
         # 底部按鈕
         bottom_frame = ttk.Frame(self.window, style="Dialog.TFrame")
@@ -546,25 +519,25 @@ class CustomVoiceDialog:
                   command=self.window.destroy).pack(side="right")
         
         # 目前狀態
-        self.status_label = ttk.Label(bottom_frame, text="請選擇或創建語音設定檔", 
+        self.status_label = ttk.Label(bottom_frame, text="請選擇或創建語音克隆", 
                                      style="Dialog.TLabel")
         self.status_label.pack(side="left")
     
     def refresh_profiles(self):
-        """刷新語音設定檔列表"""
-        if not CUSTOM_VOICE_ENABLED:
+        """刷新語音克隆檔案列表"""
+        if not VOICE_CLONING_ENABLED or not voice_cloning_system:
             return
             
         self.profile_listbox.delete(0, tk.END)
-        profiles = custom_voice_system.get_voice_profiles()
+        profiles = voice_cloning_system.get_voice_profiles()
         
         for profile in profiles:
             self.profile_listbox.insert(tk.END, profile)
         
         # 如果有目前使用的設定檔，選中它
-        if custom_voice_system.current_voice_profile:
+        if voice_cloning_system.current_profile:
             for i, profile in enumerate(profiles):
-                if profile == custom_voice_system.current_voice_profile:
+                if profile == voice_cloning_system.current_profile:
                     self.profile_listbox.selection_clear(0, tk.END)
                     self.profile_listbox.selection_set(i)
                     self.current_profile = profile
@@ -577,135 +550,111 @@ class CustomVoiceDialog:
         if selection:
             self.current_profile = self.profile_listbox.get(selection[0])
             self.update_recording_status()
-            self.status_label.config(text=f"已選擇設定檔：{self.current_profile}")
+            self.status_label.config(text=f"已選擇：{self.current_profile}")
     
     def create_new_profile(self):
-        """創建新的語音設定檔"""
-        profile_name = simpledialog.askstring("新增設定檔", 
-                                            "請輸入設定檔名稱：",
+        """創建新的語音克隆設定檔"""
+        profile_name = simpledialog.askstring("新增克隆", 
+                                            "請輸入克隆名稱：",
                                             parent=self.window)
         if profile_name and profile_name.strip():
-            if custom_voice_system.create_voice_profile(profile_name.strip()):
+            if voice_cloning_system.create_voice_profile(profile_name.strip()):
                 self.refresh_profiles()
-                self.status_label.config(text=f"已創建設定檔：{profile_name.strip()}")
+                self.status_label.config(text=f"已創建：{profile_name.strip()}")
             else:
-                messagebox.showerror("錯誤", "創建設定檔失敗")
+                messagebox.showerror("錯誤", "創建克隆失敗")
     
     def delete_profile(self):
-        """刪除選中的語音設定檔"""
+        """刪除選中的語音克隆"""
         if not self.current_profile:
-            messagebox.showwarning("警告", "請先選擇要刪除的設定檔")
+            messagebox.showwarning("警告", "請先選擇要刪除的克隆")
             return
         
         if messagebox.askyesno("確認刪除", 
-                             f"確定要刪除設定檔 '{self.current_profile}' 嗎？\n這將刪除所有相關的錄音檔案。",
+                             f"確定要刪除克隆 '{self.current_profile}' 嗎？",
                              parent=self.window):
-            if custom_voice_system.delete_voice_profile(self.current_profile):
+            if voice_cloning_system.delete_voice_profile(self.current_profile):
                 self.current_profile = None
                 self.refresh_profiles()
-                self.status_label.config(text="設定檔已刪除")
+                self.status_label.config(text="克隆已刪除")
             else:
-                messagebox.showerror("錯誤", "刪除設定檔失敗")
+                messagebox.showerror("錯誤", "刪除克隆失敗")
     
     def set_as_default(self):
-        """將選中的設定檔設為預設"""
+        """將選中的克隆設為預設"""
         if not self.current_profile:
-            messagebox.showwarning("警告", "請先選擇要設為預設的設定檔")
+            messagebox.showwarning("警告", "請先選擇要設為預設的克隆")
             return
         
-        if custom_voice_system.set_active_voice_profile(self.current_profile):
-            self.status_label.config(text=f"已將 '{self.current_profile}' 設為預設語音")
+        if voice_cloning_system.set_active_profile(self.current_profile):
+            self.status_label.config(text=f"已設為預設：{self.current_profile}")
             if VOICE_ENABLED:
-                speak("已設定客製化語音", wait=False)
+                speak("已設定語音克隆", wait=False)
         else:
-            messagebox.showerror("錯誤", "設定預設語音失敗")
+            messagebox.showerror("錯誤", "設定預設克隆失敗")
     
-    def toggle_recording(self, sample_type: str, prompt: str):
+    def toggle_recording(self):
         """切換錄音狀態"""
         if not self.current_profile:
-            messagebox.showwarning("警告", "請先選擇一個語音設定檔")
+            messagebox.showwarning("警告", "請先選擇或創建一個克隆")
             return
         
         if not self.recording:
             # 開始錄音
             self.recording = True
-            self.current_sample_type = sample_type
-            
-            # 更新按鈕狀態
-            for i, (name, key, p) in enumerate(self.recording_items):
-                if key == sample_type:
-                    self.recording_buttons[i].config(text="⏹️ 停止")
-                    break
-            
-            self.status_label.config(text=f"錄音中：{prompt}")
-            
-            # 顯示錄音提示
-            messagebox.showinfo("開始錄音", f"準備開始錄音\n\n請說：{prompt}\n\n點擊確定後開始錄音", 
-                              parent=self.window)
+            self.record_button.config(text="⏹️ 停止錄音")
+            self.status_label.config(text="錄音中... 請說話")
             
             # 開始錄音
-            if custom_voice_system.start_recording(callback=self.on_recording_complete):
-                print(f"開始錄音：{sample_type}")
+            if voice_cloning_system.start_recording(callback=self.on_recording_complete):
+                print(f"開始錄音")
             else:
                 self.recording = False
+                self.record_button.config(text="🎤 開始錄音")
                 messagebox.showerror("錯誤", "無法開始錄音，請檢查麥克風設備")
-                self.reset_recording_button()
         else:
             # 停止錄音
             self.recording = False
-            self.status_label.config(text="正在保存錄音...")
+            self.record_button.config(text="🎤 開始錄音")
+            self.status_label.config(text="正在保存參考音頻...")
             
             # 停止錄音並獲取檔案路徑
-            audio_path = custom_voice_system.stop_recording()
+            audio_path = voice_cloning_system.stop_recording()
             
             if audio_path:
                 self.current_recording_path = audio_path
-                # 錄音完成的回調會處理保存
             else:
                 messagebox.showerror("錯誤", "錄音失敗")
-                self.reset_recording_button()
                 self.status_label.config(text="錄音失敗")
     
     def on_recording_complete(self):
         """錄音完成回調"""
         if hasattr(self, 'current_recording_path') and self.current_recording_path:
-            # 保存語音樣本
-            if custom_voice_system.save_voice_sample(
+            # 保存參考音頻
+            if voice_cloning_system.save_reference_audio(
                 self.current_profile, 
-                self.current_sample_type, 
                 self.current_recording_path
             ):
-                self.status_label.config(text="錄音保存成功")
+                self.status_label.config(text="參考音頻已保存")
                 self.update_recording_status()
+                messagebox.showinfo("成功", "語音克隆已保存，將用於 TTS 合成")
             else:
-                messagebox.showerror("錯誤", "保存錄音失敗")
+                messagebox.showerror("錯誤", "保存參考音頻失敗")
             
             self.current_recording_path = None
-        
-        self.reset_recording_button()
-    
-    def reset_recording_button(self):
-        """重置錄音按鈕狀態"""
-        for i, (name, key, prompt) in enumerate(self.recording_items):
-            self.recording_buttons[i].config(text="🎤 錄音")
     
     def update_recording_status(self):
         """更新錄音狀態顯示"""
         if not self.current_profile:
-            for status_label in self.recording_status:
-                status_label.config(text="未錄製", foreground="#999")
+            self.record_status_label.config(text="未選擇", foreground="#999")
             return
         
-        profile_path = os.path.join(custom_voice_system.voice_profiles_dir, self.current_profile)
+        reference_audio = voice_cloning_system.get_reference_audio_path() if voice_cloning_system.current_profile == self.current_profile else None
         
-        for i, (name, key, prompt) in enumerate(self.recording_items):
-            filename = f"{key}.wav"
-            filepath = os.path.join(profile_path, filename)
-            
-            if os.path.exists(filepath):
-                self.recording_status[i].config(text="✓ 已錄製", foreground="#4CAF50")
-            else:
-                self.recording_status[i].config(text="未錄製", foreground="#999")
+        if reference_audio:
+            self.record_status_label.config(text="✓ 已錄製", foreground="#4CAF50")
+        else:
+            self.record_status_label.config(text="未錄製", foreground="#999")
 
 def enable_buttons():
     """重新啟用主按鈕 (加入檢查)"""
@@ -714,7 +663,7 @@ def enable_buttons():
         if image_button and image_button.winfo_exists(): image_button.config(state=tk.NORMAL)
         if video_button and video_button.winfo_exists(): video_button.config(state=tk.NORMAL)
         if live_button and live_button.winfo_exists(): live_button.config(state=tk.NORMAL) # 新增
-        if custom_voice_button and custom_voice_button.winfo_exists(): custom_voice_button.config(state=tk.NORMAL) # 新增
+        if voice_cloning_button and voice_cloning_button.winfo_exists(): voice_cloning_button.config(state=tk.NORMAL) # 新增
     except tk.TclError:
         pass # 視窗可能已關閉
 
@@ -730,7 +679,7 @@ def set_busy(is_busy: bool):
             if image_button and image_button.winfo_exists(): image_button.config(state=tk.DISABLED)
             if video_button and video_button.winfo_exists(): video_button.config(state=tk.DISABLED)
             if live_button and live_button.winfo_exists(): live_button.config(state=tk.DISABLED) # 新增
-            if custom_voice_button and custom_voice_button.winfo_exists(): custom_voice_button.config(state=tk.DISABLED) # 新增
+            if voice_cloning_button and voice_cloning_button.winfo_exists(): voice_cloning_button.config(state=tk.DISABLED) # 新增
             
             if status_bar and status_bar.winfo_exists():
                 progress_bar.pack(side=tk.BOTTOM, fill=tk.X, before=status_bar)
@@ -1078,7 +1027,7 @@ def start_live_capture():
         if image_button: image_button.config(state=tk.DISABLED)
         if video_button: video_button.config(state=tk.DISABLED)
         if live_button: live_button.config(state=tk.DISABLED)
-        if custom_voice_button: custom_voice_button.config(state=tk.DISABLED)
+        if voice_cloning_button: voice_cloning_button.config(state=tk.DISABLED)
     except tk.TclError: pass
 
 
@@ -1240,7 +1189,7 @@ def voice_interaction_loop():
 def create_gui():
     global result_text_widget, status_label_var, app_window
     global image_button, video_button, live_button # 新增 live_button
-    global custom_voice_button # 新增客製化語音按鈕
+    global voice_cloning_button # 新增語音克隆按鈕
     global progress_bar
     global image_preview_label, narration_output_widget, video_preview_label
     global status_bar 
@@ -1389,18 +1338,18 @@ def create_gui():
     custom_btn_frame = ttk.Frame(main_frame)
     custom_btn_frame.pack(fill="x", pady=(0, 20))
     
-    custom_voice_button = tk.Button(custom_btn_frame, text="🎙️客製化語音設定", command=open_custom_voice_dialog,
+    voice_cloning_button = tk.Button(custom_btn_frame, text="🎙️語音克隆設定", command=open_voice_cloning_dialog,
                                     font=("Segoe UI", 11, "bold"), bg=COLOR_ACCENT, fg=COLOR_TEXT_LIGHT,
                                     activebackground="#FF7777", activeforeground=COLOR_TEXT_LIGHT,
                                     relief=tk.FLAT, borderwidth=0, padx=20, pady=12, cursor="hand2")
-    custom_voice_button.pack(fill="x")
+    voice_cloning_button.pack(fill="x")
 
     # --- 工具提示 (修改) ---
     try:
         ToolTip(image_button, "點擊以上傳單張圖片並輸入描述，\n使用 Llama 模型生成口述影像。")
         ToolTip(video_button, "點擊以選擇影片檔案，\n使用 Gemini 模型自動生成口述影像。")
         ToolTip(live_button, "點擊開啟攝影機，\n倒數3秒後自動拍照並生成口述影像。") # 新增
-        ToolTip(custom_voice_button, "錄製您的聲音來替換系統的預設語音提示\n創建個人化的語音體驗") # 新增
+        ToolTip(voice_cloning_button, "錄製您的聲音進行語音克隆\n讓系統使用您的音色進行 TTS 合成") # 新增
     except Exception as e: print(f"無法建立工具提示: {e}")
 
     # --- 視覺輸出區 ---
