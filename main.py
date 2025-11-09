@@ -427,7 +427,6 @@ class VoiceCloningDialog:
         self.parent = parent
         self.current_profile = None
         self.recording = False
-        self.current_recording_path = None
         
         self.window = tk.Toplevel(parent)
         self.window.title("🎙️ 語音克隆設定")
@@ -523,26 +522,49 @@ class VoiceCloningDialog:
                                      style="Dialog.TLabel")
         self.status_label.pack(side="left")
     
+    def _select_profile(self, profile_name: str) -> bool:
+        """在列表中選擇指定的語音克隆檔案"""
+        if not profile_name:
+            return False
+        for index in range(self.profile_listbox.size()):
+            if self.profile_listbox.get(index) == profile_name:
+                self.profile_listbox.selection_clear(0, tk.END)
+                self.profile_listbox.selection_set(index)
+                self.profile_listbox.activate(index)
+                self.profile_listbox.see(index)
+                self.current_profile = profile_name
+                self.update_recording_status()
+                return True
+        return False
+    
     def refresh_profiles(self):
         """刷新語音克隆檔案列表"""
         if not VOICE_CLONING_ENABLED or not voice_cloning_system:
             return
             
+        previous_selection = self.current_profile
         self.profile_listbox.delete(0, tk.END)
         profiles = voice_cloning_system.get_voice_profiles()
         
         for profile in profiles:
             self.profile_listbox.insert(tk.END, profile)
         
-        # 如果有目前使用的設定檔，選中它
-        if voice_cloning_system.current_profile:
-            for i, profile in enumerate(profiles):
-                if profile == voice_cloning_system.current_profile:
-                    self.profile_listbox.selection_clear(0, tk.END)
-                    self.profile_listbox.selection_set(i)
-                    self.current_profile = profile
-                    self.update_recording_status()
-                    break
+        selected_profile = None
+        if previous_selection and previous_selection in profiles:
+            selected_profile = previous_selection
+        elif voice_cloning_system.current_profile and voice_cloning_system.current_profile in profiles:
+            selected_profile = voice_cloning_system.current_profile
+        
+        if selected_profile and self._select_profile(selected_profile):
+            if selected_profile == voice_cloning_system.current_profile:
+                self.status_label.config(text=f"目前預設：{selected_profile}")
+            else:
+                self.status_label.config(text=f"已選擇：{selected_profile}")
+        else:
+            self.profile_listbox.selection_clear(0, tk.END)
+            self.current_profile = None
+            self.update_recording_status()
+            self.status_label.config(text="請選擇或創建語音克隆")
     
     def on_profile_select(self, event):
         """處理設定檔選擇事件"""
@@ -557,12 +579,19 @@ class VoiceCloningDialog:
         profile_name = simpledialog.askstring("新增克隆", 
                                             "請輸入克隆名稱：",
                                             parent=self.window)
-        if profile_name and profile_name.strip():
-            if voice_cloning_system.create_voice_profile(profile_name.strip()):
-                self.refresh_profiles()
-                self.status_label.config(text=f"已創建：{profile_name.strip()}")
-            else:
-                messagebox.showerror("錯誤", "創建克隆失敗")
+        if not profile_name:
+            return
+        profile_name = profile_name.strip()
+        if not profile_name:
+            messagebox.showwarning("提示", "克隆名稱不可為空")
+            return
+        
+        if voice_cloning_system.create_voice_profile(profile_name):
+            self.current_profile = profile_name
+            self.refresh_profiles()
+            self.status_label.config(text=f"已創建並選擇：{profile_name}")
+        else:
+            self.status_label.config(text="創建克隆失敗，請重試")
     
     def delete_profile(self):
         """刪除選中的語音克隆"""
@@ -600,58 +629,54 @@ class VoiceCloningDialog:
             return
         
         if not self.recording:
-            # 開始錄音
             self.recording = True
             self.record_button.config(text="⏹️ 停止錄音")
             self.status_label.config(text="錄音中... 請說話")
             
-            # 開始錄音
-            if voice_cloning_system.start_recording(callback=self.on_recording_complete):
-                print(f"開始錄音")
+            if voice_cloning_system.start_recording():
+                print("開始錄音")
             else:
                 self.recording = False
                 self.record_button.config(text="🎤 開始錄音")
+                self.status_label.config(text="無法開始錄音")
                 messagebox.showerror("錯誤", "無法開始錄音，請檢查麥克風設備")
         else:
-            # 停止錄音
             self.recording = False
             self.record_button.config(text="🎤 開始錄音")
             self.status_label.config(text="正在保存參考音頻...")
             
-            # 停止錄音並獲取檔案路徑
             audio_path = voice_cloning_system.stop_recording()
             
             if audio_path:
-                self.current_recording_path = audio_path
+                self._save_reference_audio(audio_path)
             else:
-                messagebox.showerror("錯誤", "錄音失敗")
                 self.status_label.config(text="錄音失敗")
+                messagebox.showerror("錯誤", "錄音失敗")
     
-    def on_recording_complete(self):
-        """錄音完成回調"""
-        if hasattr(self, 'current_recording_path') and self.current_recording_path:
-            # 保存參考音頻
-            if voice_cloning_system.save_reference_audio(
-                self.current_profile, 
-                self.current_recording_path
-            ):
-                self.status_label.config(text="參考音頻已保存")
-                self.update_recording_status()
-                messagebox.showinfo("成功", "語音克隆已保存，將用於 TTS 合成")
-            else:
-                messagebox.showerror("錯誤", "保存參考音頻失敗")
-            
-            self.current_recording_path = None
+    def _save_reference_audio(self, audio_path: str):
+        """保存錄音並更新狀態"""
+        success = voice_cloning_system.save_reference_audio(self.current_profile, audio_path)
+        if success:
+            self.refresh_profiles()
+            self.status_label.config(text="參考音頻已保存")
+            self.update_recording_status()
+            messagebox.showinfo("成功", "語音克隆已保存，將用於 TTS 合成")
+        else:
+            self.status_label.config(text="保存參考音頻失敗")
+            messagebox.showerror("錯誤", "保存參考音頻失敗")
     
     def update_recording_status(self):
         """更新錄音狀態顯示"""
+        if not VOICE_CLONING_ENABLED or not voice_cloning_system:
+            self.record_status_label.config(text="功能未啟用", foreground="#E67E22")
+            return
+        
         if not self.current_profile:
             self.record_status_label.config(text="未選擇", foreground="#999")
             return
         
-        reference_audio = voice_cloning_system.get_reference_audio_path() if voice_cloning_system.current_profile == self.current_profile else None
-        
-        if reference_audio:
+        has_reference = voice_cloning_system.profile_has_reference_audio(self.current_profile)
+        if has_reference:
             self.record_status_label.config(text="✓ 已錄製", foreground="#4CAF50")
         else:
             self.record_status_label.config(text="未錄製", foreground="#999")

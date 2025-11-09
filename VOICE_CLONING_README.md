@@ -44,7 +44,7 @@
 
 #### `voice_cloning.py`
 - **VoiceCloningSystem 類**：語音克隆系統的核心
-  - `initialize_tts_model()`：初始化 TTS 模型（使用 Coqui TTS GLOW-TTS）
+  - `initialize_tts_model()`：初始化 TTS 模型（優先使用 Coqui XTTS v2，並自動降級至相容模型）
   - `start_recording()` / `stop_recording()`：錄音管理
   - `save_reference_audio()`：保存參考音頻
   - `synthesize_with_cloned_voice()`：使用克隆聲音合成語音
@@ -87,12 +87,13 @@ TTS>=0.22.0  # Coqui TTS 庫
 
 ### TTS 模型選擇
 
-目前使用的模型：
-- **模型**: `tts_models/multilingual/zh/glow-tts`
-- **優點**：
-  - 支持多語言
-  - 相對輕量級
-  - 支持聲音克隆
+目前的載入策略：
+- **預設模型**：`tts_models/multilingual/multi-dataset/xtts_v2`（支援多語言語音克隆與說話人適應）
+- **備援模型**：`tts_models/multilingual/multi-dataset/xtts_v1`、`tts_models/multilingual/zh/glow-tts`
+- **特性**：
+  - 自動偵測 GPU，使用 `.to(device)` 切換裝置
+  - 內建繁體中文（`zh-tw`）與英文語言映射
+  - 若新版本 XTTS 無法載入，會自動降級至相容模型繼續服務
 
 ### GPU 支持
 
@@ -128,6 +129,12 @@ TTS>=0.22.0  # Coqui TTS 庫
 ```bash
 pip install TTS>=0.22.0
 ```
+
+### 問題 5：初始化 TTS 模型失敗（錯誤訊息包含 `'zh'`）
+**原因**：舊版模型不支援繁體中文語言代碼或設備設定異常。  
+**解決方案**：
+1. 系統會自動改用 XTTS v2 / v1，並將語言映射為 `zh-tw`
+2. 若仍失敗，請確認已安裝最新版 `TTS` 套件，或手動刪除舊版模型快取後重試
 
 ## 性能考慮
 
