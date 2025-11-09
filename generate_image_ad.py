@@ -7,35 +7,48 @@ import base64
 import uuid
 import argparse
 import traceback
-import tkinter as tk
-from tkinter import messagebox
-from typing import List, Dict, Union, Tuple, Optional
-import time
 import threading
 from dataclasses import dataclass
+from typing import List, Dict, Union, Tuple, Optional
+import time
 
-# --- 核心套件載入 ---
+# --- 避免在後台線程中初始化 Tkinter ---
+# 只在需要時導入 Tkinter (這會在預載入時被避免)
+
+# --- 核心套件載入 (分離 PIL 以使用延遲導入) ---
 try:
     import torch
     from transformers import AutoProcessor, AutoModelForCausalLM, BitsAndBytesConfig
-    from PIL import Image
     from langchain_core.documents import Document
     from langchain.retrievers import MultiVectorRetriever
     from langchain.storage import InMemoryStore
     from langchain_chroma import Chroma
     from langchain_huggingface import HuggingFaceEmbeddings
 except ImportError as e:
-    root = tk.Tk()
-    root.withdraw()
-    messagebox.showerror(
-        "套件缺失錯誤", f"錯誤：缺少必要的套件。請在適當環境中安裝相依。詳細錯誤: {e}"
-    )
+    print(f"[嚴重錯誤] 缺少必要的套件: {e}", file=sys.stderr)
+    traceback.print_exc(file=sys.stderr)
     sys.exit(1)
 
 os.environ["CHROMA_SERVER_NO_ANALYTICS"] = "True"
 
 doc_id_to_summary_map: Dict[str, str] = {}  # 確保類型提示
 ID_KEY = "doc_id"
+
+# --- PIL 延遲導入 (避免預載入時的 DLL 問題) ---
+_PIL_Image = None
+
+def get_pil_image():
+    """延遲導入 PIL Image - 只在實際使用時才導入"""
+    global _PIL_Image
+    if _PIL_Image is None:
+        try:
+            from PIL import Image as PILImage
+            _PIL_Image = PILImage
+        except ImportError as e:
+            error_msg = f"無法導入 PIL Image: {e}\n請確保 Pillow 已正確安裝：pip install --upgrade Pillow"
+            print(f"[嚴重錯誤] {error_msg}", file=sys.stderr)
+            raise RuntimeError(error_msg)
+    return _PIL_Image
 
 
 @dataclass
@@ -89,18 +102,19 @@ def encode_image_to_base64(image_path: str) -> str:
         return base64.b64encode(f.read()).decode("utf-8")
 
 
-def pil_image_to_base64(image: Image.Image, format="JPEG") -> str:
+def pil_image_to_base64(image, format="JPEG") -> str:
     """將 PIL Image 物件轉換為 Base64 字串"""
     buffered = io.BytesIO()
     image.save(buffered, format=format)
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
 
-def base64_to_pil_image(base64_string: str) -> Optional[Image.Image]:
+def base64_to_pil_image(base64_string: str):
     """將 Base64 字串解碼為 PIL Image 物件"""
     try:
+        PILImage = get_pil_image()
         img_data = base64.b64decode(base64_string)
-        return Image.open(io.BytesIO(img_data)).convert("RGB")
+        return PILImage.open(io.BytesIO(img_data)).convert("RGB")
     except Exception as e:
         print(f"Base64 解碼為 PIL 圖片失敗: {e}")
         return None
@@ -226,10 +240,10 @@ def load_pairs_from_data_dirs() -> Tuple[List[str], List[str]]:
 # --------------------------------------------------------------------------
 
 def get_llama_inputs_for_single_image_narration(
-    target_image_pil: Image.Image,
+    target_image_pil,
     target_description: str,
     retrieved_docs: List[Document]
-) -> Tuple[List[Image.Image], List[Dict[str, Union[str, List[Dict]]]]]:
+) -> Tuple[list, List[Dict[str, Union[str, List[Dict]]]]]:
     all_images_pil = [target_image_pil]
     prompt_content_list = []
 
@@ -314,9 +328,13 @@ def _generate_narration_with_resources(resources: ImageNarrationResources, image
     retriever = resources.retriever
 
     try:
-        target_image_pil = Image.open(image_file).convert("RGB")
+        PILImage = get_pil_image()
+        target_image_pil = PILImage.open(image_file).convert("RGB")
     except FileNotFoundError:
         print(f"[錯誤] 目標圖片檔不存在: {image_file}", file=sys.stderr)
+        raise
+    except RuntimeError as e:
+        print(f"[嚴重錯誤] PIL 導入或使用失敗，無法打開圖片: {e}", file=sys.stderr)
         raise
     except Exception as e:
         print(f"[錯誤] 讀取目標圖片失敗: {e}", file=sys.stderr)
