@@ -7,13 +7,14 @@ import queue
 import time
 import json
 import uuid
-from tkinter import messagebox
+import tkinter as tk
+from tkinter import ttk, messagebox, simpledialog
 import pyaudio
 import wave
 import numpy as np
 import soundfile as sf
 import librosa
-from typing import Optional, List
+from typing import Optional, Dict, List
 import traceback
 
 XTTS_AVAILABLE = False
@@ -24,19 +25,12 @@ except ImportError:
     print("[警告] TTS 庫未安裝，voice cloning 功能將被禁用。")
     TTS = None
 
-TTS_MODEL_CANDIDATES = [
-    "tts_models/multilingual/multi-dataset/xtts_v2",
-    "tts_models/multilingual/multi-dataset/xtts_v1",
-    "tts_models/multilingual/zh/glow-tts",
-]
-
 
 class VoiceCloningSystem:
     """聲音克隆系統 - 錄製參考音頻，克隆用戶音色進行 TTS 合成"""
     
     def __init__(self):
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        self.voice_profiles_dir = os.path.join(base_dir, "voice_clones")
+        self.voice_profiles_dir = "voice_clones"
         self.current_profile = None
         self.recording = False
         self.audio_queue = queue.Queue()
@@ -44,8 +38,6 @@ class VoiceCloningSystem:
         self.stream = None
         self.recorded_frames = []
         self.tts_model = None
-        self.tts_model_name = None
-        self.tts_device = None
         
         # 確保目錄存在
         os.makedirs(self.voice_profiles_dir, exist_ok=True)
@@ -63,49 +55,18 @@ class VoiceCloningSystem:
             print("[警告] TTS 庫不可用，跳過初始化")
             return
         
-        if self.tts_model is not None:
-            return
-        
-        device_preference = "cuda" if self._has_gpu() else "cpu"
-        last_error = None
-        
-        for model_name in TTS_MODEL_CANDIDATES:
-            try:
-                print(f"[語音克隆] 正在載入 TTS 模型: {model_name}...")
-                tts = TTS(model_name=model_name, progress_bar=True)
-                actual_device = device_preference
-                
-                try:
-                    tts.to(device_preference)
-                except AttributeError:
-                    # 舊版 API 沒有 to() 函式，需要透過 gpu 參數初始化
-                    if device_preference == "cuda":
-                        tts = TTS(model_name=model_name, progress_bar=True, gpu=True)
-                        actual_device = "cuda"
-                    else:
-                        actual_device = "cpu"
-                except Exception as move_err:
-                    if device_preference == "cuda":
-                        print(f"[警告] 將模型移至 GPU 失敗: {move_err}，改用 CPU")
-                        actual_device = "cpu"
-                        try:
-                            tts.to("cpu")
-                        except Exception:
-                            pass
-                
-                self.tts_model = tts
-                self.tts_model_name = model_name
-                self.tts_device = actual_device
-                print(f"[語音克隆] TTS 模型已初始化: {model_name} (使用 {actual_device})")
-                return
-            except Exception as e:
-                last_error = e
-                print(f"[警告] 模型 {model_name} 初始化失敗: {e}")
-        
-        print(f"[錯誤] 初始化 TTS 模型失敗: {last_error}")
-        self.tts_model = None
-        self.tts_model_name = None
-        self.tts_device = None
+        try:
+            print("[語音克隆] 正在初始化 TTS 模型...")
+            device = "cuda" if self._has_gpu() else "cpu"
+            self.tts_model = TTS(
+                model_name="tts_models/multilingual/zh/glow-tts",
+                progress_bar=True,
+                gpu=(device == "cuda")
+            )
+            print(f"[語音克隆] TTS 模型已初始化 (使用 {device})")
+        except Exception as e:
+            print(f"[錯誤] 初始化 TTS 模型失敗: {e}")
+            self.tts_model = None
     
     def _has_gpu(self) -> bool:
         """檢查是否有 GPU 可用"""
@@ -144,18 +105,17 @@ class VoiceCloningSystem:
         profiles = []
         try:
             for item in os.listdir(self.voice_profiles_dir):
-                if item in {"__pycache__"} or item.startswith('.'):
-                    continue
                 item_path = os.path.join(self.voice_profiles_dir, item)
-                if os.path.isdir(item_path):
-                    profiles.append(item)
+                if os.path.isdir(item_path) and item != "__pycache__":
+                    # 檢查是否包含參考音頻檔案
+                    if self._validate_profile(item_path):
+                        profiles.append(item)
         except Exception as e:
             print(f"獲取語音設定檔失敗: {e}")
-        return sorted(profiles)
+        return profiles
     
-    def profile_has_reference_audio(self, profile_name: str) -> bool:
-        """檢查指定語音設定檔是否已有參考音頻"""
-        profile_path = os.path.join(self.voice_profiles_dir, profile_name)
+    def _validate_profile(self, profile_path: str) -> bool:
+        """驗證語音設定檔是否有效"""
         reference_audio = os.path.join(profile_path, "reference_audio.wav")
         return os.path.exists(reference_audio)
     
@@ -173,7 +133,7 @@ class VoiceCloningSystem:
             messagebox.showerror("錯誤", f"創建語音設定檔失敗: {e}")
             return False
     
-    def start_recording(self) -> bool:
+    def start_recording(self, callback=None):
         """開始錄音"""
         if self.recording:
             return False
@@ -207,6 +167,9 @@ class VoiceCloningSystem:
                     except Exception as e:
                         print(f"錄音錯誤: {e}")
                         break
+                
+                if callback:
+                    callback()
             
             self.record_thread = threading.Thread(target=record_audio, daemon=True)
             self.record_thread.start()
@@ -226,38 +189,28 @@ class VoiceCloningSystem:
         self.recording = False
         
         try:
-            FORMAT = pyaudio.paInt16
-            CHANNELS = 1
-            RATE = 22050
-            sample_width = None
-            
-            if self.pa:
-                try:
-                    sample_width = self.pa.get_sample_size(FORMAT)
-                except Exception:
-                    sample_width = 2  # 預設 16-bit
-            
             if self.stream:
                 self.stream.stop_stream()
                 self.stream.close()
-                self.stream = None
             
             if self.pa:
                 self.pa.terminate()
-                self.pa = None
             
             # 保存錄音
             if self.recorded_frames:
                 temp_filename = f"temp_recording_{uuid.uuid4()}.wav"
                 temp_path = os.path.join(self.voice_profiles_dir, temp_filename)
                 
+                FORMAT = pyaudio.paInt16
+                CHANNELS = 1
+                RATE = 22050
+                
                 with wave.open(temp_path, 'wb') as wf:
                     wf.setnchannels(CHANNELS)
-                    wf.setsampwidth(sample_width or 2)
+                    wf.setsampwidth(self.pa.get_sample_size(FORMAT))
                     wf.setframerate(RATE)
                     wf.writeframes(b''.join(self.recorded_frames))
                 
-                self.recorded_frames = []
                 return temp_path
                 
         except Exception as e:
@@ -339,13 +292,12 @@ class VoiceCloningSystem:
             return True
         return False
     
-    def get_reference_audio_path(self, profile_name: Optional[str] = None) -> Optional[str]:
-        """獲取指定或目前使用的參考音頻路徑"""
-        profile = profile_name or self.current_profile
-        if not profile:
+    def get_reference_audio_path(self) -> Optional[str]:
+        """獲取目前使用的參考音頻路徑"""
+        if not self.current_profile:
             return None
         
-        profile_path = os.path.join(self.voice_profiles_dir, profile)
+        profile_path = os.path.join(self.voice_profiles_dir, self.current_profile)
         reference_audio = os.path.join(profile_path, "reference_audio.wav")
         
         if os.path.exists(reference_audio):
@@ -355,14 +307,7 @@ class VoiceCloningSystem:
     
     def synthesize_with_cloned_voice(self, text: str, output_path: str, language: str = "zh-TW") -> bool:
         """使用克隆的聲音合成語音"""
-        if not XTTS_AVAILABLE:
-            print("[警告] TTS 模型未安裝，無法進行語音克隆")
-            return False
-        
-        if self.tts_model is None:
-            self.initialize_tts_model()
-        
-        if self.tts_model is None:
+        if not XTTS_AVAILABLE or not self.tts_model:
             print("[警告] TTS 模型未初始化")
             return False
         
@@ -375,33 +320,15 @@ class VoiceCloningSystem:
             print(f"[語音克隆] 正在使用克隆聲音合成: {text}")
             
             # 確保輸出目錄存在
-            output_dir = os.path.dirname(output_path)
-            if output_dir:
-                os.makedirs(output_dir, exist_ok=True)
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
             
-            language_code = self._map_language_code(language)
-            kwargs = {
-                "text": text,
-                "file_path": output_path,
-                "speaker_wav": reference_audio,
-            }
-            if language_code:
-                kwargs["language"] = language_code
-            
-            try:
-                self.tts_model.tts_to_file(**kwargs)
-            except TypeError as type_err:
-                error_message = str(type_err)
-                if "language" in kwargs and ("language" in error_message or "unexpected keyword" in error_message):
-                    print(f"[警告] 當前模型不支援 language 參數: {type_err}，將改用模型預設語言")
-                    kwargs.pop("language", None)
-                    self.tts_model.tts_to_file(**kwargs)
-                elif "speaker_wav" in kwargs and "speaker_wav" in error_message:
-                    print(f"[錯誤] 當前載入的模型不支援 speaker_wav 參數: {type_err}")
-                    print("[提示] 請確保已下載 XTTS 模型以使用語音克隆功能。")
-                    return False
-                else:
-                    raise
+            # 使用 speaker_wav 參數進行 voice cloning
+            self.tts_model.tts_to_file(
+                text=text,
+                file_path=output_path,
+                speaker_wav=reference_audio,
+                language=self._map_language_code(language)
+            )
             
             print(f"[語音克隆] 合成完成: {output_path}")
             return True
@@ -413,20 +340,14 @@ class VoiceCloningSystem:
     
     def _map_language_code(self, language: str) -> str:
         """將語言代碼映射到 TTS 支持的格式"""
-        if not language:
-            return ""
-        normalized = language.strip()
-        key = normalized.replace("_", "-").lower()
         language_map = {
-            "zh-tw": "zh-tw",  # 中文（臺灣）
-            "zh-hant": "zh-tw",
-            "zh-cn": "zh-cn",
-            "zh": "zh-cn",
-            "en-us": "en",
-            "en-gb": "en",
+            "zh-TW": "zh-cn",  # 中文 (簡體/繁體)
+            "zh-CN": "zh-cn",
+            "en-US": "en",
             "en": "en",
+            "zh": "zh-cn"
         }
-        return language_map.get(key, key)
+        return language_map.get(language, language)
 
 
 # 全域語音克隆系統實例
