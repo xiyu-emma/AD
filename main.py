@@ -1078,7 +1078,10 @@ def preload_llama_and_db():
     gui_queue.put(lambda: update_status_safe("正在預載入模型..."))
 
     try:
+        print("[預載入] 正在導入 generate_image_ad 模組...")
         import generate_image_ad
+        
+        print("[預載入] 正在調用 preload_resources 函式...")
         resources = generate_image_ad.preload_resources(model_dir)
 
         if resources:
@@ -1088,17 +1091,37 @@ def preload_llama_and_db():
             gui_queue.put(lambda: update_status_safe("模型預載入完成，準備就緒"))
             gui_queue.put(lambda: update_gui_safe(result_text_widget, "[系統] LLaMA 模型和 RAG 資料庫已預先載入，可快速執行圖像口述影像生成。"))
         else:
-            print("[預載入] 預載入失敗。")
+            print("[預載入] 預載入失敗（資源返回 None）。")
             _preload_error = "預載入資源返回 None"
             # 將失敗訊息的 GUI 更新放入佇列
             gui_queue.put(lambda: update_status_safe("模型預載入失敗"))
+            gui_queue.put(lambda: update_gui_safe(result_text_widget, "[警告] 模型預載入失敗：資源無法加載"))
+    except ImportError as e:
+        print(f"[預載入] 模組導入錯誤: {e}")
+        print(f"[預載入] 詳細錯誤訊息:")
+        traceback.print_exc()
+        _preload_error = f"導入錯誤: {e}"
+        # 將錯誤訊息的 GUI 更新放入佇列 - 包含詳細信息
+        error_msg = f"模型預載入失敗 (導入錯誤): {str(e)[:200]}"
+        gui_queue.put(lambda: update_status_safe("模型預載入發生導入錯誤"))
+        gui_queue.put(lambda: update_gui_safe(result_text_widget, f"[警告] {error_msg}\n詳細錯誤信息請查看控制台輸出。"))
+    except RuntimeError as e:
+        print(f"[預載入] 運行時錯誤: {e}")
+        print(f"[預載入] 詳細錯誤訊息:")
+        traceback.print_exc()
+        _preload_error = f"運行時錯誤: {e}"
+        error_msg = f"模型預載入失敗 (運行時錯誤): {str(e)[:200]}"
+        gui_queue.put(lambda: update_status_safe("模型預載入發生運行時錯誤"))
+        gui_queue.put(lambda: update_gui_safe(result_text_widget, f"[警告] {error_msg}\n詳細錯誤信息請查看控制台輸出。"))
     except Exception as e:
-        print(f"[預載入] 發生錯誤: {e}")
+        print(f"[預載入] 發生未預期的錯誤: {e}")
+        print(f"[預載入] 詳細錯誤訊息:")
         traceback.print_exc()
         _preload_error = str(e)
         # 將錯誤訊息的 GUI 更新放入佇列
+        error_msg = f"模型預載入失敗: {str(e)[:200]}"
         gui_queue.put(lambda: update_status_safe("模型預載入發生錯誤"))
-        gui_queue.put(lambda: update_gui_safe(result_text_widget, f"[警告] 模型預載入失敗: {e}"))
+        gui_queue.put(lambda: update_gui_safe(result_text_widget, f"[警告] {error_msg}\n詳細錯誤信息請查看控制台輸出。"))
     finally:
         _preloading_in_progress = False
 
