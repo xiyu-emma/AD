@@ -176,9 +176,9 @@ class ToolTip:
                 tw.wm_overrideredirect(1)
             except Exception:
                 pass
-            tw.configure(bg="#30363D")
-            label = tk.Label(tw, text=self.text, justify=tk.LEFT, background="#30363D",
-                             foreground="#E6EDF3", relief=tk.SOLID, borderwidth=1,
+            tw.configure(bg="#141925")
+            label = tk.Label(tw, text=self.text, justify=tk.LEFT, background="#141925",
+                             foreground="#00D4FF", relief=tk.SOLID, borderwidth=1,
                              font=("Segoe UI", 9), padx=8, pady=5)
             label.pack()
             if self.widget.winfo_exists():
@@ -837,13 +837,13 @@ def start_live_capture(is_voice_command: bool = False):
     _live_cam_window = tk.Toplevel(app_window)
     _live_cam_window.title("即時攝影機 - 準備拍照")
     _live_cam_window.geometry("640x640")
-    _live_cam_window.configure(bg="#F2D9BB")
+    _live_cam_window.configure(bg="#0A0E1A")
     
-    _live_cam_label = ttk.Label(_live_cam_window, text="[正在啟動攝影機...]", anchor=tk.CENTER, background="#F2D9BB")
+    _live_cam_label = ttk.Label(_live_cam_window, text="[正在啟動攝影機...]", anchor=tk.CENTER, background="#0A0E1A")
     _live_cam_label.pack(expand=True, fill="both", padx=10, pady=10)
     
     status_label = ttk.Label(_live_cam_window, text="3秒後將自動拍照", font=("Segoe UI", 12, "bold"), 
-                             foreground="#376C8B", background="#F2D9BB")
+                             foreground="#00D4FF", background="#0A0E1A")
     status_label.pack(pady=5)
 
     def on_close_camera_window():
@@ -1028,15 +1028,15 @@ def create_gui():
             pass  # macOS 會使用 geometry 設定
 
     # --- 應用 Sun Valley 淺色主題 ---
-    sv_ttk.set_theme("light")
+    sv_ttk.set_theme("dark")
     
     # --- 自定義配色方案 ---
-    COLOR_BG_MAIN = "#F2D9BB"
-    COLOR_BG_CARD = "#FFF9F0"
-    COLOR_PRIMARY = "#376C8B"
-    COLOR_SECONDARY = "#638FA8"
-    COLOR_ACCENT = "#FF5757"
-    COLOR_TEXT_DARK = "#2C3E50"
+    COLOR_BG_MAIN = "#0A0E1A"
+    COLOR_BG_CARD = "#141925"
+    COLOR_PRIMARY = "#00D4FF"
+    COLOR_SECONDARY = "#7B2FFF"
+    COLOR_ACCENT = "#00FF88"
+    COLOR_TEXT_DARK = "#E8F4FD"
     COLOR_TEXT_LIGHT = "#FFFFFF"
     
     # --- 自定義樣式增強 ---
@@ -1050,7 +1050,7 @@ def create_gui():
     style.configure("TFrame", background=COLOR_BG_MAIN)
     style.configure("TLabel", background=COLOR_BG_MAIN, foreground=COLOR_TEXT_DARK)
     
-    style.configure("Header.TLabel", font=("Segoe UI", 28, "bold"), 
+    style.configure("Header.TLabel", font=("Segoe UI", 32, "bold"), 
                     foreground=COLOR_PRIMARY, background=COLOR_BG_MAIN)
     style.configure("SubHeader.TLabel", font=("Segoe UI", 11), 
                     foreground=COLOR_SECONDARY, background=COLOR_BG_MAIN)
@@ -1061,21 +1061,21 @@ def create_gui():
     style.configure("Primary.TButton", 
                     font=("Segoe UI", 12, "bold"), 
                     padding=(18, 14),
-                    foreground=COLOR_TEXT_DARK,
+                    foreground=COLOR_TEXT_LIGHT,
                     background=COLOR_PRIMARY,
-                    borderwidth=0,
-                    relief="flat")
+                    borderwidth=2,
+                    relief="solid")
     style.map("Primary.TButton",
               foreground=[("!active", COLOR_TEXT_DARK), ("pressed", COLOR_TEXT_DARK), ("active", COLOR_TEXT_DARK), ("hover", COLOR_TEXT_DARK)],
-              background=[("!active", COLOR_PRIMARY), ("pressed", COLOR_SECONDARY), ("active", COLOR_SECONDARY), ("hover", COLOR_SECONDARY)])
+              background=[("!active", COLOR_PRIMARY), ("pressed", COLOR_SECONDARY), ("active", COLOR_SECONDARY), ("hover", COLOR_HOVER)])
     
     style.configure("Secondary.TButton", 
                     font=("Segoe UI", 11), 
                     padding=(12, 10),
                     foreground=COLOR_TEXT_LIGHT,
-                    background=COLOR_SECONDARY,
-                    borderwidth=0,
-                    relief="flat")
+                    background=COLOR_PRIMARY,
+                    borderwidth=2,
+                    relief="solid")
     style.map("Secondary.TButton",
               foreground=[("!active", COLOR_TEXT_LIGHT), ("pressed", COLOR_TEXT_LIGHT), ("active", COLOR_TEXT_LIGHT), ("hover", COLOR_TEXT_LIGHT)],
               background=[("!active", COLOR_SECONDARY), ("pressed", COLOR_PRIMARY), ("active", COLOR_PRIMARY), ("hover", COLOR_PRIMARY)])
@@ -1084,21 +1084,21 @@ def create_gui():
                     font=("Segoe UI", 11, "bold"),
                     foreground=COLOR_TEXT_LIGHT,
                     background=COLOR_ACCENT,
-                    borderwidth=0,
-                    relief="flat")
+                    borderwidth=2,
+                    relief="solid")
     style.map("Accent.TButton",
               foreground=[("!active", COLOR_TEXT_LIGHT), ("pressed", COLOR_TEXT_LIGHT), ("active", COLOR_TEXT_LIGHT), ("hover", COLOR_TEXT_LIGHT)],
               background=[("!active", COLOR_ACCENT), ("pressed", "#FF7777"), ("active", "#FF7777"), ("hover", "#FF7777")])
     
     style.configure("Card.TLabelframe", borderwidth=2, relief="solid", 
-                    background=COLOR_BG_CARD, bordercolor=COLOR_SECONDARY)
+                    background=COLOR_BG_CARD, bordercolor=COLOR_BORDER)
     style.configure("Card.TLabelframe.Label", font=("Segoe UI", 12, "bold"), 
                     foreground=COLOR_PRIMARY, background=COLOR_BG_CARD)
     
     style.configure("Status.TLabel", font=("Segoe UI", 10), padding=(8, 5),
                     background=COLOR_BG_MAIN, foreground=COLOR_TEXT_DARK)
     
-    style.configure("VoiceControl.TFrame", background=COLOR_BG_MAIN, relief=tk.SOLID, borderwidth=1)
+    style.configure("VoiceControl.TFrame", background=COLOR_BG_CARD, relief=tk.SOLID, borderwidth=1)
     
     style.configure("TSeparator", background=COLOR_SECONDARY)
 
@@ -1111,7 +1111,7 @@ def create_gui():
     header_frame.pack(fill="x", pady=(0, 20))
     
     header_label = tk.Label(header_frame, text="🎙️口述影像生成系統",
-                           font=("Segoe UI", 28, "bold"), fg=COLOR_PRIMARY, bg=COLOR_BG_MAIN)
+                           font=("Segoe UI", 32, "bold"), fg=COLOR_PRIMARY, bg=COLOR_BG_MAIN)
     header_label.pack(anchor="w", fill="x")
     subheader_label = tk.Label(header_frame, text="為視障者生成圖像與影片的口述影像旁白 - AI-Powered Audio Description Generator",
                               font=("Segoe UI", 11), fg=COLOR_SECONDARY, bg=COLOR_BG_MAIN)
@@ -1126,20 +1126,20 @@ def create_gui():
     
     image_button = tk.Button(btn_frame, text="🖼️生成圖像口述影像", command=start_image_analysis,
                              font=("Segoe UI", 12, "bold"), bg=COLOR_PRIMARY, fg=COLOR_TEXT_LIGHT,
-                             activebackground=COLOR_SECONDARY, activeforeground=COLOR_TEXT_LIGHT,
-                             relief=tk.FLAT, borderwidth=0, padx=18, pady=14, cursor="hand2")
+                             activebackground=COLOR_PRIMARY, activeforeground=COLOR_TEXT_LIGHT,
+                             relief=tk.FLAT, borderwidth=2, padx=18, pady=14, cursor="hand2")
     image_button.pack(side="left", expand=True, fill="x", padx=(0, 6))
     
     video_button = tk.Button(btn_frame, text="🎬生成口述影像旁白", command=start_video_analysis,
                              font=("Segoe UI", 12, "bold"), bg=COLOR_PRIMARY, fg=COLOR_TEXT_LIGHT,
-                             activebackground=COLOR_SECONDARY, activeforeground=COLOR_TEXT_LIGHT,
-                             relief=tk.FLAT, borderwidth=0, padx=18, pady=14, cursor="hand2")
+                             activebackground=COLOR_PRIMARY, activeforeground=COLOR_TEXT_LIGHT,
+                             relief=tk.FLAT, borderwidth=2, padx=18, pady=14, cursor="hand2")
     video_button.pack(side="left", expand=True, fill="x", padx=6)
     
     live_button = tk.Button(btn_frame, text="📸生成即時口述影像", command=start_live_capture,
                             font=("Segoe UI", 12, "bold"), bg=COLOR_PRIMARY, fg=COLOR_TEXT_LIGHT,
-                            activebackground=COLOR_SECONDARY, activeforeground=COLOR_TEXT_LIGHT,
-                            relief=tk.FLAT, borderwidth=0, padx=18, pady=14, cursor="hand2")
+                            activebackground=COLOR_PRIMARY, activeforeground=COLOR_TEXT_LIGHT,
+                            relief=tk.FLAT, borderwidth=2, padx=18, pady=14, cursor="hand2")
     live_button.pack(side="left", expand=True, fill="x", padx=(6, 0))
 
     # --- 工具提示 ---
@@ -1163,7 +1163,7 @@ def create_gui():
     
     image_preview_label = tk.Label(image_output_frame, text="[此處顯示圖片預覽]", anchor=tk.CENTER,
                                     bg=COLOR_BG_CARD, fg=COLOR_SECONDARY, font=("Segoe UI", 10),
-                                    relief=tk.SOLID, borderwidth=1, highlightbackground=COLOR_SECONDARY,
+                                    relief=tk.SOLID, borderwidth=1, highlightbackground=COLOR_PRIMARY,
                                     highlightthickness=1, padx=10, pady=40)
     image_preview_label.pack(expand=True, fill="both", pady=(0, 10))
     
@@ -1181,7 +1181,7 @@ def create_gui():
         bg=bg_color,
         fg=fg_color,
         highlightthickness=0,
-        highlightbackground=COLOR_SECONDARY,
+        highlightbackground=COLOR_PRIMARY,
         highlightcolor=COLOR_SECONDARY,
     )
     narration_output_widget.pack(expand=True, fill="both", pady=(5, 0))
@@ -1192,7 +1192,7 @@ def create_gui():
     
     video_preview_label = tk.Label(video_output_frame, text="[此處顯示影片預覽]", anchor=tk.CENTER,
                                     bg=COLOR_BG_CARD, fg=COLOR_SECONDARY, font=("Segoe UI", 10),
-                                    relief=tk.SOLID, borderwidth=1, highlightbackground=COLOR_SECONDARY,
+                                    relief=tk.SOLID, borderwidth=1, highlightbackground=COLOR_PRIMARY,
                                     highlightthickness=1, padx=10, pady=40)
     video_preview_label.pack(expand=True, fill="both", pady=(0, 10))
     
@@ -1213,8 +1213,8 @@ def create_gui():
     status_bar = ttk.Label(status_frame, textvariable=status_label_var, anchor=tk.W, style="Status.TLabel")
     status_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
     
-    style.configure("TProgressbar", troughcolor=COLOR_BG_CARD, background=COLOR_SECONDARY, 
-                    bordercolor=COLOR_SECONDARY, lightcolor=COLOR_PRIMARY, darkcolor=COLOR_PRIMARY)
+    style.configure("TProgressbar", troughcolor=COLOR_BG_CARD, background=COLOR_PRIMARY, 
+                    bordercolor=COLOR_BORDER, lightcolor=COLOR_ACCENT, darkcolor=COLOR_ACCENT)
     progress_bar = ttk.Progressbar(root, mode="indeterminate")
 
     # --- 音色選擇區容器 (固定在視窗下方, 狀態列上方) ---
