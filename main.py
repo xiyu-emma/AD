@@ -512,7 +512,7 @@ def run_image_generation_in_thread(image_path: str, description: str, is_voice_c
                 app_window.after(0, update_gui_safe, result_text_widget, "[提示] 未找到圖片路徑或生成結果用於顯示。")
         
         # 2. 等待一小段時間讓 GUI 更新完成
-        time.sleep(0.5)
+        time.sleep(0.1)
         
         # 3. 再使用 TTS 語音朗讀口述影像內容
         if VOICE_ENABLED: 
@@ -1149,7 +1149,7 @@ def create_gui():
         ToolTip(live_button, "點擊開啟攝影機,\n倒數3秒後自動拍照並生成口述影像。")
     except Exception as e: print(f"無法建立工具提示: {e}")
 
-    # --- 視覺輸出區 ---
+    # --- 視覺輸出区 ---
     output_area_frame = ttk.Frame(main_frame)
     output_area_frame.pack(expand=True, fill="both", pady=(0, 10))
     
@@ -1201,11 +1201,23 @@ def create_gui():
     try: ToolTip(open_external_btn, "使用系統預設播放器開啟生成的影片檔案")
     except Exception: pass
 
-    # === 修改：音色選擇區移到底部，狀態條上方 ===
+    # === 【修改】佈局順序調整 ===
+    # 1. 狀態列 (先 pack, 位於最底部)
+    # 2. 音色選擇區 (後 pack, 位於狀態列上方)
     
-    # === 修改：音色選擇區移到底部，狀態條上方 ===
+    # --- 狀態列與進度列 ---
+    status_frame = ttk.Frame(root, relief=tk.FLAT, padding=(0, 2))
+    status_frame.pack(side=tk.BOTTOM, fill=tk.X)
     
-    # --- 音色選擇區容器 (固定在視窗下方) ---
+    status_label_var = tk.StringVar(value="✓ 準備就緒 - Ready")
+    status_bar = ttk.Label(status_frame, textvariable=status_label_var, anchor=tk.W, style="Status.TLabel")
+    status_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
+    
+    style.configure("TProgressbar", troughcolor=COLOR_BG_CARD, background=COLOR_SECONDARY, 
+                    bordercolor=COLOR_SECONDARY, lightcolor=COLOR_PRIMARY, darkcolor=COLOR_PRIMARY)
+    progress_bar = ttk.Progressbar(root, mode="indeterminate")
+
+    # --- 音色選擇區容器 (固定在視窗下方, 狀態列上方) ---
     voice_control_frame = ttk.Frame(root, padding=(15, 8), relief=tk.SOLID, borderwidth=1)
     voice_control_frame.pack(side=tk.BOTTOM, fill=tk.X)
     voice_control_frame.configure(style="VoiceControl.TFrame")
@@ -1258,18 +1270,6 @@ def create_gui():
                 pass
         except Exception as e:
             print(f"[警告] 無法載入音色選擇功能: {e}")
-
-    # --- 狀態列與進度列 ---
-    status_frame = ttk.Frame(root, relief=tk.FLAT, padding=(0, 2))
-    status_frame.pack(side=tk.BOTTOM, fill=tk.X)
-    
-    status_label_var = tk.StringVar(value="✓ 準備就緒 - Ready")
-    status_bar = ttk.Label(status_frame, textvariable=status_label_var, anchor=tk.W, style="Status.TLabel")
-    status_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
-    
-    style.configure("TProgressbar", troughcolor=COLOR_BG_CARD, background=COLOR_SECONDARY, 
-                    bordercolor=COLOR_SECONDARY, lightcolor=COLOR_PRIMARY, darkcolor=COLOR_PRIMARY)
-    progress_bar = ttk.Progressbar(root, mode="indeterminate")
 
     # --- 啟動 GUI 佇列處理 ---
     root.after(100, process_gui_queue)
