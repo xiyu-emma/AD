@@ -66,6 +66,9 @@ _is_task_running.set()
 # --- 語音互動控制旗標 ---
 _voice_interaction_enabled = True
 
+# --- 語音引擎實例 (用於強制停止) ---
+_voice_engine = None
+
 # --- 模型預載入狀態 ---
 _preloading_in_progress = False
 _preload_completed = False
@@ -96,6 +99,30 @@ def update_status_safe(text):
             print(f"更新狀態列時發生 TclError (可能視窗已關閉): {e}")
         except Exception as e:
             print(f"更新狀態列時發生未知錯誤: {e}")
+
+def force_stop_speaking():
+    """強制停止當前的語音播放"""
+    global _voice_engine
+    try:
+        # 嘗試停止 pyttsx3 引擎
+        if _voice_engine:
+            _voice_engine.stop()
+        
+        # 如果有其他語音引擎實例，也嘗試停止
+        try:
+            import pyttsx3
+            if hasattr(pyttsx3, '_activeEngines'):
+                for engine in list(pyttsx3._activeEngines.values()):
+                    try:
+                        engine.stop()
+                    except:
+                        pass
+        except:
+            pass
+            
+        print("[語音] 已強制停止語音播放")
+    except Exception as e:
+        print(f"[警告] 停止語音時發生錯誤: {e}")
 
 # 簡易工具提示類別
 class ToolTip:
@@ -462,19 +489,28 @@ def run_image_generation_in_thread(image_path: str, description: str, is_voice_c
             app_window.after(0, update_gui_safe, result_text_widget, success_msg)
             app_window.after(0, update_status_safe, f"{script_type} 完成")
         
-        # 處理完成後使用 TTS 語音朗讀
+        # === 修改重點：先顯示圖片和文字，再朗讀 ===
+        
+        # 1. 先在畫面上顯示圖片和口述影像文字
+        if final_image_path and final_answer:
+            if app_window and app_window.winfo_exists():
+                app_window.after(0, show_image_and_text, final_image_path, final_answer)
+                print("[顯示] 圖片和口述影像已顯示在畫面上")
+        else:
+            if app_window and app_window.winfo_exists():
+                app_window.after(0, update_gui_safe, result_text_widget, "[提示] 未找到圖片路徑或生成結果用於顯示。")
+        
+        # 2. 等待一小段時間讓 GUI 更新完成
+        time.sleep(0.5)
+        
+        # 3. 再使用 TTS 語音朗讀口述影像內容
         if VOICE_ENABLED: 
             speak(f"{script_type} 處理完成", wait=True)
             # 朗讀圖像口述影像內容
             if final_answer:
+                print("[語音] 開始朗讀口述影像內容")
                 speak(final_answer, wait=True)
-
-        if final_image_path and final_answer:
-            if app_window and app_window.winfo_exists():
-                app_window.after(0, show_image_and_text, final_image_path, final_answer)
-        else:
-            if app_window and app_window.winfo_exists():
-                app_window.after(0, update_gui_safe, result_text_widget, "[提示] 未找到圖片路徑或生成結果用於顯示。")
+                print("[語音] 口述影像朗讀完成")
 
     except Exception as e:
         error_msg = f"執行圖像生成時發生未預期的錯誤: {e}\n{traceback.format_exc()}"
@@ -493,12 +529,14 @@ def run_image_generation_in_thread(image_path: str, description: str, is_voice_c
                 app_window.after(200, start_voice_interaction_thread)
 
 
+
 def start_image_analysis(is_voice_command: bool = False):
     global _last_selected_image_path, _voice_interaction_enabled
     
-    # 如果是按鈕點擊,停止語音互動
-    if not is_voice_command:
-        _voice_interaction_enabled = False
+    # === 第一步：立即禁用語音並停止播放 ===
+    _voice_interaction_enabled = False
+    force_stop_speaking()
+    print(f"[圖像分析] 語音已停止，is_voice_command={is_voice_command}")
     
     if not _preload_completed:
         msg = "模型仍在預載入中,請稍候..." if _preloading_in_progress else "模型預載入失敗,無法執行圖像分析。"
@@ -508,6 +546,7 @@ def start_image_analysis(is_voice_command: bool = False):
             messagebox.showinfo("請稍候", msg, parent=app_window)
         if _preload_error:
              update_gui_safe(result_text_widget, f"[錯誤] {_preload_error}")
+        _voice_interaction_enabled = True  # 失敗時恢復語音
         return
 
     if is_voice_command:
@@ -516,20 +555,17 @@ def start_image_analysis(is_voice_command: bool = False):
     file_path = filedialog.askopenfilename(title="請選擇一張圖片", filetypes=[("Image Files", "*.png *.jpg *.jpeg *.webp *.bmp")])
     if not file_path:
         if is_voice_command: speak("操作已取消")
-        # 取消時重新啟用語音
-        _voice_interaction_enabled = True
+        _voice_interaction_enabled = True  # 取消時恢復語音
         return
 
     desc = simpledialog.askstring("圖片描述", "請輸入這張圖片的描述或重點:", parent=app_window)
     if desc is None:
         if is_voice_command: speak("操作已取消")
-        # 取消時重新啟用語音
-        _voice_interaction_enabled = True
+        _voice_interaction_enabled = True  # 取消時恢復語音
         return
     if not desc.strip():
         messagebox.showwarning("輸入錯誤", "圖片描述不能為空。", parent=app_window)
-        # 輸入錯誤時重新啟用語音
-        _voice_interaction_enabled = True
+        _voice_interaction_enabled = True  # 輸入錯誤時恢復語音
         return
 
     _last_selected_image_path = file_path
@@ -554,28 +590,26 @@ def start_image_analysis(is_voice_command: bool = False):
 def start_video_analysis(is_voice_command: bool = False):
     global _voice_interaction_enabled
     
-    # 如果是按鈕點擊,停止語音互動
-    if not is_voice_command:
-        _voice_interaction_enabled = False
+    # === 第一步：立即禁用語音並停止播放 ===
+    _voice_interaction_enabled = False
+    force_stop_speaking()
+    print(f"[影片分析] 語音已停止，is_voice_command={is_voice_command}")
     
     file_path = filedialog.askopenfilename(
         title="請選擇一個影片", 
         filetypes=[("Video Files", "*.mp4 *.avi *.mov *.mkv")]
     )
     if not file_path: 
-        # 取消時重新啟用語音
-        _voice_interaction_enabled = True
+        _voice_interaction_enabled = True  # 取消時恢復語音
         return
 
     desc = simpledialog.askstring("影片摘要", "請輸入這段影片的摘要或重點:", parent=app_window)
     if desc is None: 
-        # 取消時重新啟用語音
-        _voice_interaction_enabled = True
+        _voice_interaction_enabled = True  # 取消時恢復語音
         return
     if not desc.strip():
         messagebox.showwarning("輸入錯誤", "影片摘要不能為空。", parent=app_window)
-        # 輸入錯誤時重新啟用語音
-        _voice_interaction_enabled = True
+        _voice_interaction_enabled = True  # 輸入錯誤時恢復語音
         return
         
     if result_text_widget and result_text_widget.winfo_exists():
@@ -687,8 +721,7 @@ def capture_photo_and_proceed():
         messagebox.showwarning("錯誤", "攝影機未開啟,無法拍照。")
         stop_live_capture()
         enable_buttons()
-        # 失敗時重新啟用語音
-        _voice_interaction_enabled = True
+        _voice_interaction_enabled = True  # 失敗時恢復語音
         return
         
     try:
@@ -697,8 +730,7 @@ def capture_photo_and_proceed():
         messagebox.showerror("缺少套件", "需要 OpenCV (cv2) 來拍照。")
         stop_live_capture()
         enable_buttons()
-        # 失敗時重新啟用語音
-        _voice_interaction_enabled = True
+        _voice_interaction_enabled = True  # 失敗時恢復語音
         return
 
     ret, frame = _live_cam_cap.read()
@@ -709,8 +741,7 @@ def capture_photo_and_proceed():
         messagebox.showerror("拍照失敗", "無法從攝影機擷取影像。")
         if VOICE_ENABLED: speak("拍照失敗")
         enable_buttons()
-        # 失敗時重新啟用語音
-        _voice_interaction_enabled = True
+        _voice_interaction_enabled = True  # 失敗時恢復語音
         return
 
     try:
@@ -725,8 +756,7 @@ def capture_photo_and_proceed():
         messagebox.showerror("儲存失敗", f"無法儲存拍攝的相片: {e}")
         if VOICE_ENABLED: speak("儲存相片失敗")
         enable_buttons()
-        # 失敗時重新啟用語音
-        _voice_interaction_enabled = True
+        _voice_interaction_enabled = True  # 失敗時恢復語音
         return
 
     if not _preload_completed:
@@ -735,16 +765,14 @@ def capture_photo_and_proceed():
         if _preload_error:
              update_gui_safe(result_text_widget, f"[錯誤] {_preload_error}")
         enable_buttons()
-        # 失敗時重新啟用語音
-        _voice_interaction_enabled = True
+        _voice_interaction_enabled = True  # 失敗時恢復語音
         return
 
     desc = simpledialog.askstring("圖片描述", "請輸入這張相片的描述或重點:", parent=app_window)
     if desc is None or not desc.strip():
         if VOICE_ENABLED: speak("取消操作")
         enable_buttons()
-        # 取消時重新啟用語音
-        _voice_interaction_enabled = True
+        _voice_interaction_enabled = True  # 取消時恢復語音
         return
 
     _last_selected_image_path = file_path
@@ -765,9 +793,10 @@ def start_live_capture(is_voice_command: bool = False):
     """開啟即時攝影機視窗並開始倒數"""
     global _live_cam_window, _live_cam_label, _live_cam_cap, _voice_interaction_enabled
     
-    # 如果是按鈕點擊,停止語音互動
-    if not is_voice_command:
-        _voice_interaction_enabled = False
+    # === 第一步：立即禁用語音並停止播放 ===
+    _voice_interaction_enabled = False
+    force_stop_speaking()
+    print(f"[即時拍照] 語音已停止，is_voice_command={is_voice_command}")
     
     stop_video_playback()
     stop_live_capture()
@@ -776,8 +805,7 @@ def start_live_capture(is_voice_command: bool = False):
         import cv2
     except ImportError:
         messagebox.showerror("缺少套件", "需要 OpenCV (cv2) 來使用攝影機功能。")
-        # 失敗時重新啟用語音
-        _voice_interaction_enabled = True
+        _voice_interaction_enabled = True  # 失敗時恢復語音
         return
 
     _live_cam_cap = cv2.VideoCapture(0)
@@ -786,8 +814,7 @@ def start_live_capture(is_voice_command: bool = False):
         if VOICE_ENABLED: speak("找不到攝影機")
         if _live_cam_cap: _live_cam_cap.release()
         _live_cam_cap = None
-        # 失敗時重新啟用語音
-        _voice_interaction_enabled = True
+        _voice_interaction_enabled = True  # 失敗時恢復語音
         return
 
     set_busy(True)
@@ -812,9 +839,8 @@ def start_live_capture(is_voice_command: bool = False):
     def on_close_camera_window():
         stop_live_capture()
         enable_buttons()
-        # 關閉視窗時重新啟用語音
         global _voice_interaction_enabled
-        _voice_interaction_enabled = True
+        _voice_interaction_enabled = True  # 關閉視窗時恢復語音
     
     _live_cam_window.protocol("WM_DELETE_WINDOW", on_close_camera_window)
 
