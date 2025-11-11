@@ -162,26 +162,30 @@ class ToolTip:
     def _showtip(self, event=None):
         if self.tipwindow or not self.text or not self.widget.winfo_exists():
             return
-        try: bbox = self.widget.bbox("insert") if hasattr(self.widget, "bbox") else None
-        except Exception: bbox = None
+        try:
+            bbox = self.widget.bbox("insert") if hasattr(self.widget, "bbox") else None
+        except Exception:
+            bbox = None
         x, y = (0, 0) if not bbox else (bbox[0], bbox[1] + bbox[3])
         x += self.widget.winfo_rootx() + 20
         y += self.widget.winfo_rooty() + 20
 
         try:
-             self.tipwindow = tw = tk.Toplevel(self.widget)
-             try: tw.wm_overrideredirect(1)
-             except Exception: pass
-             tw.configure(bg="#638FA8")
-             label = tk.Label(tw, text=self.text, justify=tk.LEFT, background="#638FA8",
-                              foreground="white", relief=tk.SOLID, borderwidth=1,
-                              font=("Segoe UI", 9), padx=8, pady=5)
-             label.pack()
-             if self.widget.winfo_exists():
-                 tw.wm_geometry(f"+{x}+{y}")
+            self.tipwindow = tw = tk.Toplevel(self.widget)
+            try:
+                tw.wm_overrideredirect(1)
+            except Exception:
+                pass
+            tw.configure(bg="#30363D")
+            label = tk.Label(tw, text=self.text, justify=tk.LEFT, background="#30363D",
+                             foreground="#E6EDF3", relief=tk.SOLID, borderwidth=1,
+                             font=("Segoe UI", 9), padx=8, pady=5)
+            label.pack()
+            if self.widget.winfo_exists():
+                tw.wm_geometry(f"+{x}+{y}")
         except Exception as e:
             print(f"ToolTip _showtip error: {e}")
-            self._hidetip() 
+            self._hidetip()
 
     def _hidetip(self):
         tw = self.tipwindow
