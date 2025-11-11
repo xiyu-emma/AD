@@ -16,6 +16,7 @@ import html
 from functools import lru_cache
 from typing import Optional
 import requests
+import threading
 
 # --- 語音克隆系統 ---
 try:
@@ -36,6 +37,9 @@ AZURE_TTS_USER_AGENT = "NarrationGeneratorApp/1.0"
 
 _session = requests.Session()
 
+# --- 全域旗標：控制語音停止 ---
+_stop_voice_flag = threading.Event()
+_voice_input_cancelled = threading.Event()
 
 class AzureTTSException(Exception):
     pass
@@ -231,6 +235,38 @@ except pygame.error as e:
     # sys.exit(1)
 
 # --------------------------------------------------------------------------
+#                           【語音控制函式】
+# --------------------------------------------------------------------------
+
+def stop_all_voice():
+    """強制停止所有語音輸出和輸入"""
+    global _stop_voice_flag, _voice_input_cancelled
+    
+    print("[語音控制] 強制停止所有語音")
+    
+    # 設定停止旗標
+    _stop_voice_flag.set()
+    _voice_input_cancelled.set()
+    
+    # 停止 pygame 播放
+    try:
+        if pygame.mixer.get_init():
+            pygame.mixer.music.stop()
+            pygame.mixer.music.unload()
+    except Exception as e:
+        print(f"[警告] 停止 pygame 時出錯: {e}")
+
+
+def resume_voice():
+    """清除停止旗標，允許語音繼續執行"""
+    global _stop_voice_flag, _voice_input_cancelled
+    
+    print("[語音控制] 清除停止旗標，允許語音繼續")
+    _stop_voice_flag.clear()
+    _voice_input_cancelled.clear()
+
+
+# --------------------------------------------------------------------------
 #                           【核心語音功能】
 # --------------------------------------------------------------------------
 def detect_language(text):
@@ -241,6 +277,13 @@ def detect_language(text):
 
 def speak(text, wait=True):
     """增強版語音輸出，包含語音克隆支援和錯誤處理"""
+    global _stop_voice_flag
+    
+    # 檢查是否被停止
+    if _stop_voice_flag.is_set():
+        print("[語音] 已被停止，不播放")
+        return
+    
     if not text or not text.strip(): return
     if not pygame.mixer.get_init():
         print("[錯誤] Pygame mixer 未初始化，無法播放語音。")
@@ -258,6 +301,11 @@ def speak(text, wait=True):
                 
                 if wait:
                     while pygame.mixer.get_init() and pygame.mixer.music.get_busy():
+                        # 檢查停止旗標
+                        if _stop_voice_flag.is_set():
+                            pygame.mixer.music.stop()
+                            print("[語音] 播放中被停止")
+                            return
                         time.sleep(0.1)
                 return
             except Exception as e:
@@ -274,6 +322,11 @@ def speak(text, wait=True):
 
     async def _generate_speech():
         try:
+            # 再次檢查停止旗標
+            if _stop_voice_flag.is_set():
+                print("[語音] 生成前被停止")
+                return
+            
             locale = LANG_CONFIG[lang_code].get("locale", "zh-TW")
             await synthesize_speech_to_file_async(
                 text,
@@ -282,6 +335,11 @@ def speak(text, wait=True):
                 speech_rate=speech_rate,
                 language=locale,
             )
+
+            # 檢查停止旗標
+            if _stop_voice_flag.is_set():
+                print("[語音] 生成後被停止，不播放")
+                return
 
             if not pygame.mixer.get_init():
                 print("[警告] Pygame mixer 在生成語音後變為未初始化狀態。")
@@ -298,6 +356,11 @@ def speak(text, wait=True):
 
             if wait:
                 while pygame.mixer.get_init() and pygame.mixer.music.get_busy():
+                    # 檢查停止旗標
+                    if _stop_voice_flag.is_set():
+                        pygame.mixer.music.stop()
+                        print("[語音] 播放中被停止")
+                        return
                     await asyncio.sleep(0.1)
 
         except AzureTTSException as e:
@@ -376,14 +439,29 @@ def _generate_cloned_voice(text: str) -> Optional[str]:
 
 
 def voice_input(prompt, timeout=15):
-    """統一的語音輸入介面"""
+    """統一的語音輸入介面，支援取消機制"""
+    global _voice_input_cancelled
+    
+    # 清除之前的取消狀態
+    _voice_input_cancelled.clear()
+    
     if voice_ux.beginner_mode:
         speak(prompt + "。聆聽中，請在提示音後說話")
     else:
         speak(prompt)
+    
+    # 檢查是否已被取消
+    if _voice_input_cancelled.is_set():
+        print("[語音輸入] 已被取消")
+        return None
 
     audio.beep_listening()
     result = recognize_speech(timeout)
+
+    # 檢查是否在辨識過程中被取消
+    if _voice_input_cancelled.is_set():
+        print("[語音輸入] 辨識後被取消")
+        return None
 
     if result and result not in ["timeout", "error", "unknown"]:
         audio.beep_success()
@@ -400,16 +478,28 @@ def voice_input(prompt, timeout=15):
     return None
 
 def recognize_speech(timeout=15):
-    """核心語音辨識"""
+    """核心語音辨識，支援取消機制"""
+    global _voice_input_cancelled
+    
     r = sr.Recognizer()
     try:
         with sr.Microphone() as source:
-            # print("正在調整環境噪音...") # 調試用
+            # 檢查取消旗標
+            if _voice_input_cancelled.is_set():
+                return None
+            
             r.adjust_for_ambient_noise(source, duration=0.5)
-            # print("請開始說話...") # 調試用
-            # 使用 listen_in_background 可能更適合 GUI，但 listen 較簡單
+            
+            # 檢查取消旗標
+            if _voice_input_cancelled.is_set():
+                return None
+            
             audio_data = r.listen(source, timeout=timeout, phrase_time_limit=10)
-            # print("正在辨識...") # 調試用
+            
+            # 檢查取消旗標
+            if _voice_input_cancelled.is_set():
+                return None
+            
             text = r.recognize_google(audio_data, language="zh-TW")
             print(f"辨識到: {text.strip()}")
             return text.strip()
