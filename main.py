@@ -17,7 +17,7 @@ try:
     from voice_interface import speak, voice_input, VoiceCommands, audio
     VOICE_ENABLED = True
 except ImportError:
-    print("[警告] voice_interface.py 未找到或導入失敗，語音功能將被禁用。")
+    print("[警告] voice_interface.py 未找到或導入失敗,語音功能將被禁用。")
     VOICE_ENABLED = False
     def speak(text, **kwargs): print(f"[語音模擬]: {text}")
     def voice_input(prompt, **kwargs): print(f"[語音模擬] 提示: {prompt}"); return None
@@ -62,6 +62,9 @@ _live_cam_tk_img = None
 # --- 執行緒同步旗標 ---
 _is_task_running = threading.Event()
 _is_task_running.set()
+
+# --- 語音互動控制旗標 (新增) ---
+_voice_interaction_enabled = True
 
 # --- 模型預載入狀態 ---
 _preloading_in_progress = False
@@ -271,7 +274,7 @@ def play_video_in_ui(video_path: str):
 
     _video_cap = cv2.VideoCapture(video_path)
     if not _video_cap or not _video_cap.isOpened():
-        update_gui_safe(result_text_widget, f"[警告] 無法開啟影片檔案進行預覽：{video_path}")
+        update_gui_safe(result_text_widget, f"[警告] 無法開啟影片檔案進行預覽:{video_path}")
         return
 
     print(f"開始預覽影片: {video_path}")
@@ -289,17 +292,17 @@ def open_video_external():
         elif sys.platform == 'darwin': subprocess.Popen(['open', path])
         else: subprocess.Popen(['xdg-open', path])
     except Exception as e:
-        update_gui_safe(result_text_widget, f"[警告] 開啟外部播放器失敗：{e}")
+        update_gui_safe(result_text_widget, f"[警告] 開啟外部播放器失敗:{e}")
         messagebox.showerror("開啟失敗", f"無法使用系統播放器開啟影片:\n{e}")
 
 # --- 執行緒函式 ---
-def run_script_in_thread(script_name: str, script_type: str, args: list):
+def run_script_in_thread(script_name: str, script_type: str, args: list, should_restart_voice: bool = True):
     """在背景執行緒中執行腳本並將輸出傳回 GUI"""
     global _last_selected_image_path
     if app_window and app_window.winfo_exists():
         app_window.after(0, update_status_safe, f"正在執行 {script_type} 程序...")
         app_window.after(0, update_gui_safe, result_text_widget, f"\n--- 開始執行 {script_name} ---")
-    if VOICE_ENABLED: speak(f"正在啟動，{script_type}口述影像生成程序")
+    if VOICE_ENABLED: speak(f"正在啟動,{script_type}口述影像生成程序")
 
     final_answer = f"[{script_type} 未返回明確答案]"
     final_video_path = None
@@ -327,7 +330,7 @@ def run_script_in_thread(script_name: str, script_type: str, args: list):
                 if s_line.startswith("FINAL_ANSWER:"): final_answer = s_line.replace("FINAL_ANSWER:", "").strip()
                 elif s_line.startswith("FINAL_VIDEO:"): final_video_path = s_line.replace("FINAL_VIDEO:", "").strip()
                 elif s_line.startswith("FINAL_IMAGE:"): final_image_path = s_line.replace("FINAL_IMAGE:", "").strip()
-                elif "最終影片已儲存為：" in s_line: capture_next_video_path = True
+                elif "最終影片已儲存為:" in s_line: capture_next_video_path = True
                 elif capture_next_video_path and s_line: final_video_path = s_line; capture_next_video_path = False
             process.stdout.close()
 
@@ -367,12 +370,12 @@ def run_script_in_thread(script_name: str, script_type: str, args: list):
             if VOICE_ENABLED: speak(f"啟動 {script_type} 處理程序時發生錯誤"); audio.beep_error()
 
     except FileNotFoundError:
-        error_msg = f"錯誤：找不到腳本檔案 '{script_name}' 或 Python 執行檔 '{sys.executable}'"
+        error_msg = f"錯誤:找不到腳本檔案 '{script_name}' 或 Python 執行檔 '{sys.executable}'"
         print(error_msg)
         if app_window and app_window.winfo_exists():
              app_window.after(0, update_gui_safe, result_text_widget, error_msg)
              app_window.after(0, update_status_safe, f"{script_type} 失敗 (找不到檔案)")
-        if VOICE_ENABLED: speak(f"啟動{script_type}失敗，找不到檔案"); audio.beep_error()
+        if VOICE_ENABLED: speak(f"啟動{script_type}失敗,找不到檔案"); audio.beep_error()
     except Exception as e:
         error_msg = f"執行 {script_name} 時發生未預期的錯誤: {e}\n{traceback.format_exc()}"
         print(error_msg)
@@ -394,7 +397,8 @@ def run_script_in_thread(script_name: str, script_type: str, args: list):
         if app_window and app_window.winfo_exists():
             app_window.after(100, enable_buttons)
             app_window.after(0, set_busy, False)
-            if VOICE_ENABLED:
+            # 只有在應該重啟語音時才重啟
+            if VOICE_ENABLED and should_restart_voice:
                 app_window.after(200, start_voice_interaction_thread)
 
 def enable_buttons():
@@ -435,7 +439,7 @@ def set_busy(is_busy: bool):
         pass
 
 # --- 啟動流程 ---
-def run_image_generation_in_thread(image_path: str, description: str):
+def run_image_generation_in_thread(image_path: str, description: str, should_restart_voice: bool = True):
     """在背景執行緒中直接呼叫圖像生成函式"""
     script_type = "圖像"
     try:
@@ -474,15 +478,20 @@ def run_image_generation_in_thread(image_path: str, description: str):
         if app_window and app_window.winfo_exists():
             app_window.after(100, enable_buttons)
             app_window.after(0, set_busy, False)
-            if VOICE_ENABLED:
+            # 只有在應該重啟語音時才重啟
+            if VOICE_ENABLED and should_restart_voice:
                 app_window.after(200, start_voice_interaction_thread)
 
 
 def start_image_analysis(is_voice_command: bool = False):
-    global _last_selected_image_path
+    global _last_selected_image_path, _voice_interaction_enabled
+    
+    # 如果是按鈕點擊,停止語音互動
+    if not is_voice_command:
+        _voice_interaction_enabled = False
     
     if not _preload_completed:
-        msg = "模型仍在預載入中，請稍候..." if _preloading_in_progress else "模型預載入失敗，無法執行圖像分析。"
+        msg = "模型仍在預載入中,請稍候..." if _preloading_in_progress else "模型預載入失敗,無法執行圖像分析。"
         if is_voice_command:
             speak(msg)
         else:
@@ -492,14 +501,14 @@ def start_image_analysis(is_voice_command: bool = False):
         return
 
     if is_voice_command:
-        speak("請手動選擇圖片檔案，並輸入描述。")
+        speak("請手動選擇圖片檔案,並輸入描述。")
 
     file_path = filedialog.askopenfilename(title="請選擇一張圖片", filetypes=[("Image Files", "*.png *.jpg *.jpeg *.webp *.bmp")])
     if not file_path:
         if is_voice_command: speak("操作已取消")
         return
 
-    desc = simpledialog.askstring("圖片描述", "請輸入這張圖片的描述或重點：", parent=app_window)
+    desc = simpledialog.askstring("圖片描述", "請輸入這張圖片的描述或重點:", parent=app_window)
     if desc is None:
         if is_voice_command: speak("操作已取消")
         return
@@ -523,17 +532,24 @@ def start_image_analysis(is_voice_command: bool = False):
 
     set_busy(True)
 
-    thread = threading.Thread(target=run_image_generation_in_thread, args=(file_path, desc), daemon=True)
+    # 傳遞語音重啟標誌
+    thread = threading.Thread(target=run_image_generation_in_thread, args=(file_path, desc, is_voice_command), daemon=True)
     thread.start()
 
-def start_video_analysis():
+def start_video_analysis(is_voice_command: bool = False):
+    global _voice_interaction_enabled
+    
+    # 如果是按鈕點擊,停止語音互動
+    if not is_voice_command:
+        _voice_interaction_enabled = False
+    
     file_path = filedialog.askopenfilename(
         title="請選擇一個影片", 
         filetypes=[("Video Files", "*.mp4 *.avi *.mov *.mkv")]
     )
     if not file_path: return
 
-    desc = simpledialog.askstring("影片摘要", "請輸入這段影片的摘要或重點：", parent=app_window)
+    desc = simpledialog.askstring("影片摘要", "請輸入這段影片的摘要或重點:", parent=app_window)
     if desc is None: return
     if not desc.strip():
         messagebox.showwarning("輸入錯誤", "影片摘要不能為空。", parent=app_window)
@@ -554,7 +570,8 @@ def start_video_analysis():
 
     args = ["--video_file", file_path, "--summary", desc]
     
-    thread = threading.Thread(target=run_script_in_thread, args=('generate_video_ad.py', '影片', args), daemon=True)
+    # 傳遞語音重啟標誌
+    thread = threading.Thread(target=run_script_in_thread, args=('generate_video_ad.py', '影片', args, is_voice_command), daemon=True)
     thread.start()
 
 # --- 即時攝影機相關函式 ---
@@ -641,11 +658,11 @@ def run_countdown(count):
         capture_photo_and_proceed()
 
 def capture_photo_and_proceed():
-    """執行拍照、儲存，並觸發分析"""
+    """執行拍照、儲存,並觸發分析"""
     global _last_selected_image_path, _live_cam_cap
     
     if _live_cam_cap is None or not _live_cam_cap.isOpened():
-        messagebox.showwarning("錯誤", "攝影機未開啟，無法拍照。")
+        messagebox.showwarning("錯誤", "攝影機未開啟,無法拍照。")
         stop_live_capture()
         enable_buttons()
         return
@@ -683,14 +700,14 @@ def capture_photo_and_proceed():
         return
 
     if not _preload_completed:
-        msg = "模型仍在預載入中，請稍候..." if _preloading_in_progress else "模型預載入失敗，無法執行即時分析。"
+        msg = "模型仍在預載入中,請稍候..." if _preloading_in_progress else "模型預載入失敗,無法執行即時分析。"
         messagebox.showinfo("請稍候", msg, parent=app_window)
         if _preload_error:
              update_gui_safe(result_text_widget, f"[錯誤] {_preload_error}")
         enable_buttons()
         return
 
-    desc = simpledialog.askstring("圖片描述", "請輸入這張相片的描述或重點：", parent=app_window)
+    desc = simpledialog.askstring("圖片描述", "請輸入這張相片的描述或重點:", parent=app_window)
     if desc is None or not desc.strip():
         if VOICE_ENABLED: speak("取消操作")
         enable_buttons()
@@ -706,12 +723,17 @@ def capture_photo_and_proceed():
 
     set_busy(True)
 
-    thread = threading.Thread(target=run_image_generation_in_thread, args=(file_path, desc), daemon=True)
+    # 即時拍照也是語音命令觸發,應該重啟語音
+    thread = threading.Thread(target=run_image_generation_in_thread, args=(file_path, desc, True), daemon=True)
     thread.start()
 
-def start_live_capture():
+def start_live_capture(is_voice_command: bool = False):
     """開啟即時攝影機視窗並開始倒數"""
-    global _live_cam_window, _live_cam_label, _live_cam_cap
+    global _live_cam_window, _live_cam_label, _live_cam_cap, _voice_interaction_enabled
+    
+    # 如果是按鈕點擊,停止語音互動
+    if not is_voice_command:
+        _voice_interaction_enabled = False
     
     stop_video_playback()
     stop_live_capture()
@@ -724,7 +746,7 @@ def start_live_capture():
 
     _live_cam_cap = cv2.VideoCapture(0)
     if not _live_cam_cap or not _live_cam_cap.isOpened():
-        messagebox.showerror("攝影機錯誤", "找不到攝影機，或無法開啟。")
+        messagebox.showerror("攝影機錯誤", "找不到攝影機,或無法開啟。")
         if VOICE_ENABLED: speak("找不到攝影機")
         if _live_cam_cap: _live_cam_cap.release()
         _live_cam_cap = None
@@ -769,7 +791,7 @@ def preload_llama_and_db():
     model_dir = LLAMA_MODEL_DIR
 
     if not os.path.isdir(model_dir):
-        print(f"[預載入] 找不到模型資料夾 {model_dir}，跳過預載入。")
+        print(f"[預載入] 找不到模型資料夾 {model_dir},跳過預載入。")
         _preload_error = f"找不到模型資料夾: {model_dir}"
         _preloading_in_progress = False
         return
@@ -785,15 +807,15 @@ def preload_llama_and_db():
         resources = generate_image_ad.preload_resources(model_dir)
 
         if resources:
-            print("[預載入] LLaMA 模型和 RAG 資料庫預載入完成！")
+            print("[預載入] LLaMA 模型和 RAG 資料庫預載入完成!")
             _preload_completed = True
-            gui_queue.put(lambda: update_status_safe("模型預載入完成，準備就緒"))
-            gui_queue.put(lambda: update_gui_safe(result_text_widget, "[系統] LLaMA 模型和 RAG 資料庫已預先載入，可快速執行圖像口述影像生成。"))
+            gui_queue.put(lambda: update_status_safe("模型預載入完成,準備就緒"))
+            gui_queue.put(lambda: update_gui_safe(result_text_widget, "[系統] LLaMA 模型和 RAG 資料庫已預先載入,可快速執行圖像口述影像生成。"))
         else:
-            print("[預載入] 預載入失敗（資源返回 None）。")
+            print("[預載入] 預載入失敗(資源返回 None)。")
             _preload_error = "預載入資源返回 None"
             gui_queue.put(lambda: update_status_safe("模型預載入失敗"))
-            gui_queue.put(lambda: update_gui_safe(result_text_widget, "[警告] 模型預載入失敗：資源無法加載"))
+            gui_queue.put(lambda: update_gui_safe(result_text_widget, "[警告] 模型預載入失敗:資源無法加載"))
     except ImportError as e:
         print(f"[預載入] 模組導入錯誤: {e}")
         traceback.print_exc()
@@ -838,30 +860,40 @@ def process_gui_queue():
 # --- 語音互動迴圈 ---
 def start_voice_interaction_thread():
     """啟動一個新的語音互動執行緒"""
+    global _voice_interaction_enabled
+    
     if not VOICE_ENABLED or not app_window or not app_window.winfo_exists():
+        return
+    # 檢查語音互動是否被禁用
+    if not _voice_interaction_enabled:
+        print("[語音迴圈] 語音互動已被禁用,不啟動新迴圈。")
         return
     if _is_task_running.is_set():
         voice_thread = threading.Thread(target=voice_interaction_loop, daemon=True)
         voice_thread.start()
     else:
-        print("[警告] 上一個任務尚未完全結束，暫不啟動新語音迴圈。")
+        print("[警告] 上一個任務尚未完全結束,暫不啟動新語音迴圈。")
 
 
 def voice_interaction_loop():
-    """語音互動迴圈，執行一次指令後即結束"""
+    """語音互動迴圈,執行一次指令後即結束"""
+    global _voice_interaction_enabled
+    
     if not VOICE_ENABLED or not app_window or not app_window.winfo_exists():
         return
     
     if not _is_task_running.is_set():
-        print("[語音迴圈] 偵測到任務正在執行，本次語音互動取消。")
+        print("[語音迴圈] 偵測到任務正在執行,本次語音互動取消。")
         return
 
     time.sleep(0.5)
     
-    prompt = "請說出指令：生成圖像、生成影片、即時拍照，或 結束"
+    prompt = "請說出指令:生成圖像、生成影片、即時拍照,或 結束"
     command = voice_input(prompt)
     if not command or not app_window.winfo_exists():
-        app_window.after(100, start_voice_interaction_thread)
+        # 只有在語音互動啟用時才重新啟動
+        if _voice_interaction_enabled:
+            app_window.after(100, start_voice_interaction_thread)
         return
 
     parsed = VoiceCommands.parse(command)
@@ -872,25 +904,27 @@ def voice_interaction_loop():
         app_window.after(0, lambda: start_image_analysis(is_voice_command=True))
         action_triggered = True
     elif parsed == "video":
-        speak("正在啟動影片口述影像生成程序，請稍後片刻。", wait=True)
-        app_window.after(0, start_video_analysis)
+        speak("正在啟動影片口述影像生成程序,請稍後片刻。", wait=True)
+        app_window.after(0, lambda: start_video_analysis(is_voice_command=True))
         action_triggered = True
     elif parsed == "live" or "拍照" in command:
         speak("正在啟動即時拍照功能。", wait=True)
-        app_window.after(0, start_live_capture)
+        app_window.after(0, lambda: start_live_capture(is_voice_command=True))
         action_triggered = True
     elif parsed == "exit":
-        speak("感謝您的使用，系統即將關閉")
+        speak("感謝您的使用,系統即將關閉")
         if VOICE_ENABLED: audio.beep_success()
         if app_window and app_window.winfo_exists():
             app_window.after(0, app_window.destroy)
     else:
-        speak("無法辨識指令，請重新說一次")
+        speak("無法辨識指令,請重新說一次")
         if VOICE_ENABLED: audio.beep_error()
-        app_window.after(100, start_voice_interaction_thread)
+        # 只有在語音互動啟用時才重新啟動
+        if _voice_interaction_enabled:
+            app_window.after(100, start_voice_interaction_thread)
 
     if action_triggered:
-        print(f"[語音迴圈] 指令 '{parsed}' 已觸發，此語音執行緒結束。")
+        print(f"[語音迴圈] 指令 '{parsed}' 已觸發,此語音執行緒結束。")
 
 # --- GUI 建立 ---
 def create_gui():
@@ -1030,9 +1064,9 @@ def create_gui():
 
     # --- 工具提示 ---
     try:
-        ToolTip(image_button, "點擊以上傳單張圖片並輸入描述，\n使用 Llama 模型生成口述影像。")
-        ToolTip(video_button, "點擊以選擇影片檔案，\n使用 Gemini 模型自動生成口述影像。")
-        ToolTip(live_button, "點擊開啟攝影機，\n倒數3秒後自動拍照並生成口述影像。")
+        ToolTip(image_button, "點擊以上傳單張圖片並輸入描述,\n使用 Llama 模型生成口述影像。")
+        ToolTip(video_button, "點擊以選擇影片檔案,\n使用 Gemini 模型自動生成口述影像。")
+        ToolTip(live_button, "點擊開啟攝影機,\n倒數3秒後自動拍照並生成口述影像。")
     except Exception as e: print(f"無法建立工具提示: {e}")
 
     # --- 視覺輸出區 ---
@@ -1114,11 +1148,11 @@ if __name__ == "__main__":
 
     if VOICE_ENABLED:
         intro_text = (
-            "歡迎使用口述影像生成系統。本系統能為視障者，"
-            "將圖像與影片，轉換為生動的語音口述旁白。"
-            "您可以選擇生成單張圖像的描述、為影片全自動產生口述影像，"
-            "或是使用即時拍照功能，捕捉當下畫面並生成描述。"
-            "系統正在初始化，請稍候片刻，馬上為您準備就緒。"
+            "歡迎使用口述影像生成系統。本系統能為視障者,"
+            "將圖像與影片,轉換為生動的語音口述旁白。"
+            "您可以選擇生成單張圖像的描述、為影片全自動產生口述影像,"
+            "或是使用即時拍照功能,捕捉當下畫面並生成描述。"
+            "系統正在初始化,請稍候片刻,馬上為您準備就緒。"
         )
         speak(intro_text, wait=True)
         start_voice_interaction_thread()
