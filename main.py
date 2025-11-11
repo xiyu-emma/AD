@@ -460,6 +460,8 @@ def run_image_generation_in_thread(image_path: str, description: str, should_res
             app_window.after(0, update_status_safe, f"{script_type} 完成")
         if VOICE_ENABLED: speak(f"{script_type} 處理完成", wait=True)
 
+            # 在圖像處理完成後，使用TTS念出生成的口述影像
+            if VOICE_ENABLED and final_answer: speak(final_answer, wait=False)
         if final_image_path and final_answer:
             if app_window and app_window.winfo_exists():
                 app_window.after(0, show_image_and_text, final_image_path, final_answer)
