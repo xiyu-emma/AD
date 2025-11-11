@@ -119,6 +119,13 @@ def force_stop_speaking():
                         pass
         except:
             pass
+        
+        # 停止 voice_interface 中的語音
+        try:
+            from voice_interface import stop_all_voice
+            stop_all_voice()
+        except:
+            pass
             
         print("[語音] 已強制停止語音播放")
     except Exception as e:
@@ -489,7 +496,7 @@ def run_image_generation_in_thread(image_path: str, description: str, is_voice_c
             app_window.after(0, update_gui_safe, result_text_widget, success_msg)
             app_window.after(0, update_status_safe, f"{script_type} 完成")
         
-        # === 修改重點：先顯示圖片和文字，再朗讀 ===
+        # === 修改：先顯示圖片和文字，再朗讀 ===
         
         # 1. 先在畫面上顯示圖片和口述影像文字
         if final_image_path and final_answer:
@@ -527,7 +534,6 @@ def run_image_generation_in_thread(image_path: str, description: str, is_voice_c
             _voice_interaction_enabled = True
             if VOICE_ENABLED and is_voice_command:
                 app_window.after(200, start_voice_interaction_thread)
-
 
 
 def start_image_analysis(is_voice_command: bool = False):
@@ -1088,6 +1094,8 @@ def create_gui():
     style.configure("Status.TLabel", font=("Segoe UI", 10), padding=(8, 5),
                     background=COLOR_BG_MAIN, foreground=COLOR_TEXT_DARK)
     
+    style.configure("VoiceControl.TFrame", background=COLOR_BG_MAIN, relief=tk.SOLID, borderwidth=1)
+    
     style.configure("TSeparator", background=COLOR_SECONDARY)
 
     # --- 主要容器 ---
@@ -1189,6 +1197,64 @@ def create_gui():
     try: ToolTip(open_external_btn, "使用系統預設播放器開啟生成的影片檔案")
     except Exception: pass
 
+    # === 修改：音色選擇區移到底部，狀態條上方 ===
+    
+    # === 修改：音色選擇區移到底部，狀態條上方 ===
+    
+    # --- 音色選擇區容器 (固定在視窗下方) ---
+    voice_control_frame = ttk.Frame(root, padding=(15, 8), relief=tk.SOLID, borderwidth=1)
+    voice_control_frame.pack(side=tk.BOTTOM, fill=tk.X)
+    voice_control_frame.configure(style="VoiceControl.TFrame")
+    
+    # 左側：音色選擇標籤和下拉選單
+    voice_left_frame = ttk.Frame(voice_control_frame)
+    voice_left_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
+    
+    voice_label = ttk.Label(voice_left_frame, text="🎤 語音音色:", font=("Segoe UI", 10, "bold"))
+    voice_label.pack(side=tk.LEFT, padx=(0, 10))
+    
+    # 匯入音色列表
+    if VOICE_ENABLED:
+        try:
+            from voice_interface import get_all_voices, set_voice, current_voice_name
+            
+            voice_var = tk.StringVar(value=current_voice_name)
+            voice_combobox = ttk.Combobox(
+                voice_left_frame,
+                textvariable=voice_var,
+                values=get_all_voices(),
+                state="readonly",
+                width=18,
+                font=("Segoe UI", 10)
+            )
+            voice_combobox.pack(side=tk.LEFT, padx=5)
+            
+            # 應用按鈕
+            def apply_voice():
+                """應用選擇的音色"""
+                selected_voice = voice_var.get()
+                if set_voice(selected_voice):
+                    update_status_safe(f"✓ 已切換音色: {selected_voice}")
+                    print(f"[GUI] 用戶應用音色: {selected_voice}")
+                else:
+                    update_status_safe(f"✗ 音色切換失敗: {selected_voice}")
+            
+            apply_button = ttk.Button(
+                voice_left_frame,
+                text="應用",
+                command=apply_voice,
+                style="Secondary.TButton"
+            )
+            apply_button.pack(side=tk.LEFT, padx=5)
+            
+            try:
+                ToolTip(voice_combobox, "選擇不同的語音音色")
+                ToolTip(apply_button, "點擊應用選擇的語音音色")
+            except Exception:
+                pass
+        except Exception as e:
+            print(f"[警告] 無法載入音色選擇功能: {e}")
+
     # --- 狀態列與進度列 ---
     status_frame = ttk.Frame(root, relief=tk.FLAT, padding=(0, 2))
     status_frame.pack(side=tk.BOTTOM, fill=tk.X)
@@ -1205,6 +1271,7 @@ def create_gui():
     root.after(100, process_gui_queue)
 
     return root
+
 
 # --- 程式主進入點 ---
 if __name__ == "__main__":

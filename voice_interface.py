@@ -151,6 +151,42 @@ async def synthesize_speech_to_file_async(
 
 # --- Azure TTS 整合結束 ---
 
+# --------------------------------------------------------------------------
+#                           【可用音色列表】
+# --------------------------------------------------------------------------
+AVAILABLE_VOICES = {
+    "女性-溫柔": "zh-TW-HsiaoChenNeural",
+    "男性-沉穩": "zh-TW-YunJheNeural",
+    "女性-親切": "zh-TW-HsiaoYuNeural",
+    "女性-專業": "zh-CN-XiaoxiaoNeural",
+    "男性-年輕": "zh-CN-YunxiNeural",
+    "女性-活潑": "zh-CN-XiaoxuanNeural",
+}
+
+# 預設音色
+current_voice_name = "女性-溫柔"
+current_voice_id = "zh-TW-HsiaoChenNeural"
+
+def set_voice(voice_name: str):
+    """設定當前使用的音色"""
+    global current_voice_name, current_voice_id
+    
+    if voice_name in AVAILABLE_VOICES:
+        current_voice_name = voice_name
+        current_voice_id = AVAILABLE_VOICES[voice_name]
+        print(f"[語音] 已切換音色: {voice_name} ({current_voice_id})")
+        return True
+    
+    print(f"[警告] 找不到音色: {voice_name}")
+    return False
+
+def get_current_voice():
+    """取得當前音色的 ID"""
+    return current_voice_id
+
+def get_all_voices():
+    """取得所有可用音色的名稱列表"""
+    return list(AVAILABLE_VOICES.keys())
 
 # --------------------------------------------------------------------------
 #                           【語音設定】
@@ -266,7 +302,7 @@ def speak(text, wait=True):
     # 回退到原本的 TTS 系統
     speech_rate = voice_ux.speech_rate
     lang_code = detect_language(text)
-    voice = LANG_CONFIG[lang_code]["voice"]
+    voice = get_current_voice() # 使用目前選定的音色
 
     temp_dir = "temp_audio"
     os.makedirs(temp_dir, exist_ok=True)
