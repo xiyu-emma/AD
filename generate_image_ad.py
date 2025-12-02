@@ -24,6 +24,8 @@ try:
     from langchain.storage import InMemoryStore
     from langchain_chroma import Chroma
     from langchain_huggingface import HuggingFaceEmbeddings
+    import google.generativeai as genai
+    from google.api_core.exceptions import ResourceExhausted, GoogleAPICallError, NotFound
 except ImportError as e:
     print(f"[嚴重錯誤] 缺少必要的套件: {e}", file=sys.stderr)
     traceback.print_exc(file=sys.stderr)
@@ -135,6 +137,53 @@ def is_image_data(b64data: str) -> bool:
         return any(header.startswith(sig) for sig in signatures)
     except Exception:
         return False
+
+
+# --------------------------------------------------------------------------
+#                           Gemini 圖片描述生成
+# --------------------------------------------------------------------------
+
+def generate_image_description_with_gemini(image_path: str) -> str:
+    """使用 Gemini 生成圖片的初步描述"""
+    print(f"正在使用 Gemini 生成圖片描述...")
+    try:
+        # Load API Key
+        # 嘗試從當前目錄或腳本目錄載入 api_key.txt
+        api_key_path = 'api_key.txt'
+        if not os.path.exists(api_key_path):
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            api_key_path = os.path.join(script_dir, 'api_key.txt')
+
+        if not os.path.exists(api_key_path):
+             print("[警告] 找不到 api_key.txt，無法使用 Gemini 生成描述。", file=sys.stderr)
+             return "這是一張圖片。"
+
+        with open(api_key_path, 'r', encoding='utf-8') as f:
+            api_key = f.read().strip()
+
+        if not api_key:
+             print("[警告] api_key.txt 內容為空。", file=sys.stderr)
+             return "這是一張圖片。"
+            
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        
+        PILImage = get_pil_image()
+        with PILImage.open(image_path) as img:
+             prompt = "請用一句話簡短描述這張圖片的視覺內容，包含主要物件與場景。請使用中文回答。"
+             response = model.generate_content([prompt, img])
+             
+             if response and response.text:
+                 desc = response.text.strip()
+                 print(f"Gemini 生成的描述: {desc}")
+                 return desc
+             else:
+                 print("[警告] Gemini 回傳空內容。")
+                 return "這是一張圖片。"
+                 
+    except Exception as e:
+        print(f"[警告] Gemini 生成描述失敗: {e}")
+        return "這是一張圖片。"
 
 
 # --------------------------------------------------------------------------
@@ -322,10 +371,16 @@ def clear_cached_resources() -> None:
         _cached_resources = None
 
 
-def _generate_narration_with_resources(resources: ImageNarrationResources, image_file: str, user_desc: str) -> str:
+def _generate_narration_with_resources(resources: ImageNarrationResources, image_file: str, user_desc: Optional[str]) -> str:
     model = resources.model
     processor = resources.processor
     retriever = resources.retriever
+
+    # 檢查是否需要自動生成描述
+    if not user_desc or not user_desc.strip():
+        user_desc = generate_image_description_with_gemini(image_file)
+        
+    print(f"使用的圖片重點描述: {user_desc}")
 
     try:
         PILImage = get_pil_image()
@@ -394,7 +449,7 @@ def _generate_narration_with_resources(resources: ImageNarrationResources, image
         raise
 
 
-def generate_narration(model_path: str, image_file: str, user_desc: str, *, include_final_markers: bool = False) -> Tuple[str, str]:
+def generate_narration(model_path: str, image_file: str, user_desc: Optional[str], *, include_final_markers: bool = False) -> Tuple[str, str]:
     resources = ensure_resources(model_path)
     if not resources:
         raise RuntimeError("無法載入模型或處理器。")
@@ -409,7 +464,7 @@ def generate_narration(model_path: str, image_file: str, user_desc: str, *, incl
     return response_text, final_image_path
 
 
-def generate_narration_from_preloaded(image_file: str, user_desc: str) -> Tuple[str, str]:
+def generate_narration_from_preloaded(image_file: str, user_desc: Optional[str]) -> Tuple[str, str]:
     """
     (新函式) 使用已預載入的資源生成口述影像。
     如果資源未載入，則會引發 RuntimeError。
@@ -428,7 +483,7 @@ def generate_narration_from_preloaded(image_file: str, user_desc: str) -> Tuple[
     return response_text, final_image_path
 
 
-def run_single_image_narration(model_path: str, image_file: str, user_desc: str):
+def run_single_image_narration(model_path: str, image_file: str, user_desc: Optional[str]):
     response_text, _ = generate_narration(model_path, image_file, user_desc, include_final_markers=True)
     return response_text
 
@@ -448,7 +503,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="使用 Llama 3.2 Vision 進行單張圖片的口述影像生成 (RAG 輔助)")
     parser.add_argument("--model_path", type=str, required=True, help="Llama 模型的路徑")
     parser.add_argument("--image_file", type=str, help="要生成口述影像的單張圖片檔案路徑")
-    parser.add_argument("--desc", type=str, help="使用者提供的關於該圖片的初步描述或重點")
+    parser.add_argument("--desc", type=str, help="使用者提供的關於該圖片的初步描述或重點 (可選，若未提供將使用 Gemini 生成)")
     parser.add_argument("--preload", action="store_true", help="僅預載入模型與資料庫，不進行生成")
 
     args = parser.parse_args()
@@ -466,8 +521,8 @@ if __name__ == "__main__":
             sys.exit(0)
         sys.exit(1)
 
-    if not args.image_file or not args.desc:
-        print("[錯誤] 進行生成時必須提供 --image_file 以及 --desc。", file=sys.stderr)
+    if not args.image_file:
+        print("[錯誤] 進行生成時必須提供 --image_file。", file=sys.stderr)
         sys.exit(1)
 
     if not os.path.isfile(args.image_file):
