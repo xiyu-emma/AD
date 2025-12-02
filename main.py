@@ -560,7 +560,7 @@ def start_image_analysis(is_voice_command: bool = False):
         return
 
     if is_voice_command:
-        speak("請手動選擇圖片檔案,並輸入描述。")
+        speak("請手動選擇圖片檔案。")
 
     file_path = filedialog.askopenfilename(title="請選擇一張圖片", filetypes=[("Image Files", "*.png *.jpg *.jpeg *.webp *.bmp")])
     if not file_path:
@@ -568,15 +568,10 @@ def start_image_analysis(is_voice_command: bool = False):
         _voice_interaction_enabled = True  # 取消時恢復語音
         return
 
-    desc = simpledialog.askstring("圖片描述", "請輸入這張圖片的描述或重點:", parent=app_window)
-    if desc is None:
-        if is_voice_command: speak("操作已取消")
-        _voice_interaction_enabled = True  # 取消時恢復語音
-        return
-    if not desc.strip():
-        messagebox.showwarning("輸入錯誤", "圖片描述不能為空。", parent=app_window)
-        _voice_interaction_enabled = True  # 輸入錯誤時恢復語音
-        return
+    # 改為自動生成描述
+    desc = ""
+    if is_voice_command:
+        speak("已選擇圖片，正在生成口述影像。")
 
     _last_selected_image_path = file_path
 
@@ -778,12 +773,9 @@ def capture_photo_and_proceed():
         _voice_interaction_enabled = True  # 失敗時恢復語音
         return
 
-    desc = simpledialog.askstring("圖片描述", "請輸入這張相片的描述或重點:", parent=app_window)
-    if desc is None or not desc.strip():
-        if VOICE_ENABLED: speak("取消操作")
-        enable_buttons()
-        _voice_interaction_enabled = True  # 取消時恢復語音
-        return
+    # 改為自動生成描述
+    desc = ""
+    if VOICE_ENABLED: speak("拍照完成，正在分析。")
 
     _last_selected_image_path = file_path
 
